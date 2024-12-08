@@ -170,11 +170,13 @@ export default class ExamTaker {
           this.answers[index] = userCode;
 
           console.log(`Executing Code for Question ${index + 1}:`, userCode);
+          console.log(`Selected Language: ${question.language}`);
 
           // Secure code execution using backend
-          if (question.language === 'javascript') {
-            try {
-              const response = await window.api.executeJavaScript(userCode);
+          try {
+            let response;
+            if (question.language === 'javascript') {
+              response = await window.api.executeJavaScript(userCode);
               console.log(`Execution Response for Question ${index + 1}:`, response);
               
               // Update the frontend to display logs and result
@@ -186,16 +188,26 @@ export default class ExamTaker {
               if (response.result) {
                 output.textContent += response.result;
               }
-
-            } catch (err) {
-              console.error(`Error Executing Code for Question ${index + 1}:`, err);
-              output.textContent = err.message;
+            } else if (question.language === 'python') {
+              response = await window.api.executePython(userCode);
+              console.log(`Python Execution Response for Question ${index + 1}:`, response);
+              
+              // Update the frontend to display the result
+              output.textContent = response.result || '';
+            } else if (question.language === 'java') {
+              response = await window.api.executeJava(userCode);
+              console.log(`Java Execution Response for Question ${index + 1}:`, response);
+              
+              // Update the frontend to display the result
+              output.textContent = response.result || '';
+            } else {
+              output.textContent = 'Code execution not supported for this language.';
             }
-          } else {
-            output.textContent = 'Code execution not supported for this language.';
+          } catch (err) {
+            console.error(`Error Executing Code for Question ${index + 1}:`, err);
+            output.textContent = err.message;
           }
         });
-
       }
 
       container.appendChild(questionDiv);

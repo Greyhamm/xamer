@@ -49,12 +49,52 @@ contextBridge.exposeInMainWorld('api', {
       });
       const data = await response.json();
       if (response.ok) {
-        return data; // Return the entire response object containing logs and result
+        return data; // Contains { logs: [...], result: '...' }
       } else {
         throw new Error(data.error);
       }
     } catch (error) {
-      console.error('Error executing code:', error);
+      console.error('Error executing JavaScript code:', error);
+      throw error;
+    }
+  },
+  executePython: async (code) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/execute/python', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        return data; // Contains { result: '...' }
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Error executing Python code:', error);
+      throw error;
+    }
+  },
+  executeJava: async (code) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/execute/java', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        return data; // Contains { result: '...' }
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Error executing Java code:', error);
       throw error;
     }
   },
