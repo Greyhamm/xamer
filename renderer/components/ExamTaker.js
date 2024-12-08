@@ -46,6 +46,13 @@ export default class ExamTaker {
     
     // Fetch list of exams
     const exams = await this.fetchExams();
+    if (exams.length === 0) {
+      const noExamsMsg = document.createElement('p');
+      noExamsMsg.textContent = 'No exams available. Please create an exam first.';
+      container.appendChild(noExamsMsg);
+      return container;
+    }
+
     exams.forEach((exam) => {
       const option = document.createElement('option');
       option.value = exam._id;
@@ -118,14 +125,32 @@ export default class ExamTaker {
       }
 
       if (question.type === 'Coding') {
+        // Ensure Monaco is loaded
+        if (!window.monaco) {
+          const error = document.createElement('p');
+          error.textContent = 'Monaco Editor is not loaded. Please try again later.';
+          error.style.color = 'red';
+          questionDiv.appendChild(error);
+          return;
+        }
+
         const editorContainer = document.createElement('div');
         editorContainer.style.height = '200px';
         questionDiv.appendChild(editorContainer);
 
-        const monaco = new MonacoEditorComponent(editorContainer, {
-          language: question.language,
-          value: question.code || '',
-        });
+        let monacoInstance;
+        try {
+          monacoInstance = new MonacoEditorComponent(editorContainer, {
+            language: question.language,
+            value: question.code || '// Write your code here',
+          });
+        } catch (err) {
+          console.error('Failed to initialize Monaco Editor:', err);
+          const error = document.createElement('p');
+          error.textContent = 'Failed to load code editor.';
+          error.style.color = 'red';
+          questionDiv.appendChild(error);
+        }
 
         const runBtn = document.createElement('button');
         runBtn.textContent = 'Run Code';
@@ -135,7 +160,12 @@ export default class ExamTaker {
         questionDiv.appendChild(output);
 
         runBtn.addEventListener('click', async () => {
-          const userCode = monaco.getValue();
+          if (!monacoInstance) {
+            output.textContent = 'Code editor is not initialized.';
+            return;
+          }
+
+          const userCode = monacoInstance.getValue();
           this.answers[index] = userCode;
           // Secure code execution using backend
           if (question.language === 'javascript') {

@@ -5,7 +5,14 @@
   <title>Electron Exam App</title>
   <link rel="stylesheet" href="styles.css">
   <!-- Content Security Policy -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:3000;">
+  <meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://unpkg.com;
+  style-src 'self' 'unsafe-inline' https://unpkg.com;
+  connect-src 'self' http://localhost:3000;
+  worker-src 'self' blob:;
+">
+
 </head>
 <body>
   <div id="app">
@@ -30,6 +37,12 @@
       self.MonacoEnvironment = { baseUrl: 'https://unpkg.com/monaco-editor@0.33.0/min/' };
       importScripts('https://unpkg.com/monaco-editor@0.33.0/min/vs/base/worker/workerMain.js');
     `], { type: 'text/javascript' }));
+
+    // Load Monaco Editor and assign it to window.monaco
+    require(['vs/editor/editor.main'], function() {
+      window.monaco = monaco; // Make Monaco globally accessible
+      console.log('Monaco Editor loaded successfully.');
+    });
   </script>
 
   <!-- Include Renderer Script with type="module" -->

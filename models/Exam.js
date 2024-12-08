@@ -1,4 +1,4 @@
-// models/Exam.js
+// renderer/models/Exam.js
 import { MultipleChoiceQuestion } from './MultipleChoiceQuestion.js';
 import { WrittenQuestion } from './WrittenQuestion.js';
 import { CodingQuestion } from './CodingQuestion.js';
