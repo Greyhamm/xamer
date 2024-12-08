@@ -1,9 +1,8 @@
 // renderer/components/ExamCreator.js
-import { Exam,  } from '../../models/Exam.js';
-import {  MultipleChoiceQuestion } from '../../models/MultipleChoiceQuestion.js';
-import {  WrittenQuestion } from '../../models/WrittenQuestion.js';
+import { Exam } from '../../models/Exam.js';
+import { MultipleChoiceQuestion } from '../../models/MultipleChoiceQuestion.js';
+import { WrittenQuestion } from '../../models/WrittenQuestion.js';
 import { CodingQuestion } from '../../models/CodingQuestion.js';
-
 export default class ExamCreator {
   constructor() {
     this.exam = new Exam();
@@ -15,6 +14,9 @@ export default class ExamCreator {
     const titleInput = document.createElement('input');
     titleInput.type = 'text';
     titleInput.placeholder = 'Exam Title';
+    titleInput.addEventListener('input', (e) => {
+      this.exam.title = e.target.value;
+    });
     container.appendChild(titleInput);
 
     const addMCQBtn = document.createElement('button');
@@ -54,10 +56,22 @@ export default class ExamCreator {
       questionsContainer.appendChild(this.createQuestionElement(question));
     });
 
-    saveExamBtn.addEventListener('click', () => {
-      // For simplicity, we'll save the exam to localStorage
-      localStorage.setItem('savedExam', JSON.stringify(this.exam));
-      alert('Exam Saved!');
+    saveExamBtn.addEventListener('click', async () => {
+      try {
+        const data = await window.api.createExam(this.exam);
+        if (data.message) {
+          alert('Exam Saved Successfully!');
+          // Optionally, clear the form
+          this.exam = new Exam();
+          questionsContainer.innerHTML = '';
+          titleInput.value = '';
+        } else {
+          alert(`Error: ${data.error || 'Unknown error'}`);
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Failed to save exam. Make sure the backend server is running.');
+      }
     });
 
     return container;
@@ -98,7 +112,7 @@ export default class ExamCreator {
       }
       correctSelect.value = question.correctOption;
       correctSelect.addEventListener('change', (e) => {
-        question.correctOption = e.target.value;
+        question.correctOption = parseInt(e.target.value);
       });
       div.appendChild(correctSelect);
     }

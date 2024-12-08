@@ -13,15 +13,9 @@ export default class ExamTaker {
 
   async fetchExams() {
     try {
-      const response = await fetch('http://localhost:3000/api/exams');
-      if (response.ok) {
-        const exams = await response.json();
-        return exams;
-      } else {
-        const error = await response.json();
-        alert(`Error: ${error.message}`);
-        return [];
-      }
+      const exams = await window.api.getExams();
+      console.log('Fetched Exams:', exams);
+      return exams;
     } catch (err) {
       console.error(err);
       alert('Failed to fetch exams. Make sure the backend server is running.');
@@ -31,14 +25,10 @@ export default class ExamTaker {
 
   async fetchExamById(examId) {
     try {
-      const response = await fetch(`http://localhost:3000/api/exams/${examId}`);
-      if (response.ok) {
-        const examData = await response.json();
-        this.exam = new Exam(examData);
-      } else {
-        const error = await response.json();
-        alert(`Error: ${error.message}`);
-      }
+      const examData = await window.api.getExamById(examId);
+      console.log('Fetched Exam Data:', examData);
+      this.exam = new Exam(examData);
+      console.log('Deserialized Exam:', this.exam);
     } catch (err) {
       console.error(err);
       alert('Failed to fetch exam. Make sure the backend server is running.');
@@ -47,13 +37,13 @@ export default class ExamTaker {
 
   async render() {
     const container = document.createElement('div');
-
+    
     const examSelect = document.createElement('select');
     const defaultOption = document.createElement('option');
     defaultOption.value = '';
     defaultOption.textContent = 'Select an Exam';
     examSelect.appendChild(defaultOption);
-
+    
     // Fetch list of exams
     const exams = await this.fetchExams();
     exams.forEach((exam) => {
@@ -62,13 +52,13 @@ export default class ExamTaker {
       option.textContent = exam.title || 'Untitled Exam';
       examSelect.appendChild(option);
     });
-
+    
     container.appendChild(examSelect);
-
+    
     const loadExamBtn = document.createElement('button');
     loadExamBtn.textContent = 'Load Exam';
     container.appendChild(loadExamBtn);
-
+    
     loadExamBtn.addEventListener('click', async () => {
       const selectedId = examSelect.value;
       if (selectedId === '') {
@@ -78,8 +68,8 @@ export default class ExamTaker {
       await this.fetchExamById(selectedId);
       this.renderExam(container);
     });
-
-    return container;
+    
+    return container; // Returns a DOM Node
   }
 
   renderExam(container) {
@@ -89,6 +79,8 @@ export default class ExamTaker {
     const title = document.createElement('h2');
     title.textContent = this.exam.title || 'Untitled Exam';
     container.appendChild(title);
+
+    console.log('Rendering Exam with Questions:', this.exam.questions);
 
     this.exam.questions.forEach((question, index) => {
       const questionDiv = document.createElement('div');
@@ -145,10 +137,10 @@ export default class ExamTaker {
         runBtn.addEventListener('click', async () => {
           const userCode = monaco.getValue();
           this.answers[index] = userCode;
-          // Secure code execution using VM
+          // Secure code execution using backend
           if (question.language === 'javascript') {
             try {
-              const result = await this.executeJavaScript(userCode);
+              const result = await window.api.executeJavaScript(userCode);
               output.textContent = result;
             } catch (err) {
               output.textContent = err.message;
@@ -171,32 +163,19 @@ export default class ExamTaker {
     });
   }
 
-  async executeJavaScript(code) {
-    // Note: Executing code in the renderer process using eval is insecure.
-    // For production, implement a secure sandbox or use backend services.
-    // Here, we'll use a simple implementation for demonstration purposes.
-
-    return new Promise((resolve, reject) => {
-      try {
-        const result = eval(code);
-        resolve(result);
-      } catch (error) {
-        reject(error);
-      }
-    });
-  }
-
   gradeExam() {
     let score = 0;
+    let total = 0;
     this.exam.questions.forEach((question, index) => {
       const answer = this.answers[index];
       if (question.type === 'MultipleChoice') {
+        total += 1;
         if (answer === question.correctOption) {
           score += 1;
         }
       }
       // Implement grading for other question types as needed
     });
-    alert(`Your score: ${score} / ${this.exam.questions.length}`);
+    alert(`Your score: ${score} / ${total}`);
   }
 }

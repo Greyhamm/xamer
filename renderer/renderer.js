@@ -32,7 +32,15 @@ takeExamBtn.addEventListener('click', async () => {
       return;
     }
   }
+  
   mainContent.innerHTML = '';
   const taker = new ExamTaker();
-  mainContent.appendChild(taker.render());
+  
+  try {
+    const rendered = await taker.render(); // Await the Promise
+    mainContent.appendChild(rendered); // Append the resolved Node
+  } catch (err) {
+    console.error('Failed to render ExamTaker:', err);
+    alert('Failed to render ExamTaker component.');
+  }
 });

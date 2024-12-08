@@ -1,0 +1,23 @@
+{
+  "name": "electron-exam-app",
+  "version": "1.0.0",
+  "description": "An Electron app for creating and taking exams",
+  "main": "main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "package": "electron-packager . ElectronExamApp --platform=darwin --arch=x64 --overwrite"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "electron": "^25.3.0",
+    "express": "^4.21.2",
+    "monaco-editor": "^0.33.0",
+    "mongoose": "^7.8.3",
+    "vm2": "^3.9.19"
+  },
+  "devDependencies": {
+    "electron-packager": "^17.1.1",
+    "electron-reload": "^1.5.0"
+  }
+}
