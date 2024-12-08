@@ -49,7 +49,7 @@ contextBridge.exposeInMainWorld('api', {
       });
       const data = await response.json();
       if (response.ok) {
-        return data.result;
+        return data; // Return the entire response object containing logs and result
       } else {
         throw new Error(data.error);
       }

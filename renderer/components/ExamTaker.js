@@ -159,6 +159,7 @@ export default class ExamTaker {
         const output = document.createElement('pre');
         questionDiv.appendChild(output);
 
+        // Updated runBtn event listener
         runBtn.addEventListener('click', async () => {
           if (!monacoInstance) {
             output.textContent = 'Code editor is not initialized.';
@@ -167,18 +168,34 @@ export default class ExamTaker {
 
           const userCode = monacoInstance.getValue();
           this.answers[index] = userCode;
+
+          console.log(`Executing Code for Question ${index + 1}:`, userCode);
+
           // Secure code execution using backend
           if (question.language === 'javascript') {
             try {
-              const result = await window.api.executeJavaScript(userCode);
-              output.textContent = result;
+              const response = await window.api.executeJavaScript(userCode);
+              console.log(`Execution Response for Question ${index + 1}:`, response);
+              
+              // Update the frontend to display logs and result
+              output.textContent = '';
+
+              if (response.logs && response.logs.length > 0) {
+                output.textContent += response.logs.join('\n') + '\n';
+              }
+              if (response.result) {
+                output.textContent += response.result;
+              }
+
             } catch (err) {
+              console.error(`Error Executing Code for Question ${index + 1}:`, err);
               output.textContent = err.message;
             }
           } else {
             output.textContent = 'Code execution not supported for this language.';
           }
         });
+
       }
 
       container.appendChild(questionDiv);
