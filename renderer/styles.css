@@ -1,23 +1,253 @@
 /* renderer/styles.css */
+
+/* Existing Styles */
 body {
-    font-family: Arial, sans-serif;
-    margin: 0;
-    padding: 0;
+  font-family: 'Arial', sans-serif; /* Reliable font */
+  margin: 0;
+  padding: 0;
+}
+
+header {
+  background-color: #282c34;
+  padding: 20px;
+  color: white;
+  font-family: 'Arial', sans-serif; /* Consistent font usage */
+}
+
+nav button {
+  margin-right: 10px;
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #61dafb;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+nav button:hover {
+  background-color: #21a1f1;
+}
+
+#main-content {
+  padding: 20px;
+}
+
+/* New Styles for Exam Creator */
+
+.exam-creator-container {
+  max-width: 900px;
+  margin: 20px auto;
+  padding: 25px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.exam-creator-header {
+  text-align: center;
+  margin-bottom: 25px;
+  color: #333333;
+  font-size: 1.8em;
+  border-bottom: 2px solid #f0f0f0;
+  padding-bottom: 10px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #555555;
+}
+
+.input-field,
+.select-field {
+  padding: 10px 15px;
+  border: 1px solid #cccccc;
+  border-radius: 4px;
+  font-size: 1em;
+}
+
+.input-field:focus,
+.select-field:focus {
+  border-color: #007bff;
+  outline: none;
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+.button-group {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 25px;
+  flex-wrap: wrap;
+}
+
+.btn {
+  padding: 12px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.btn-add {
+  background-color: #28a745;
+  color: #ffffff;
+}
+
+.btn-add:hover {
+  background-color: #218838;
+  transform: translateY(-2px);
+}
+
+.btn-save {
+  background-color: #007bff;
+  color: #ffffff;
+  width: 100%;
+}
+
+.btn-save:hover {
+  background-color: #0069d9;
+  transform: translateY(-2px);
+}
+
+.btn-remove {
+  background-color: #dc3545;
+  color: #ffffff;
+  padding: 6px 12px;
+  font-size: 0.9em;
+}
+
+.btn-remove:hover {
+  background-color: #c82333;
+  transform: translateY(-2px);
+}
+
+.questions-container {
+  margin-bottom: 30px;
+}
+
+.question {
+  background-color: #f9f9f9;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-left: 5px solid #007bff;
+  border-radius: 4px;
+  position: relative;
+  transition: box-shadow 0.3s ease;
+}
+
+.question:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.question-title {
+  margin: 0;
+  font-size: 1.3em;
+  color: #333333;
+}
+
+.mcq-container .form-group {
+  flex-direction: row;
+  align-items: center;
+}
+
+.mcq-container .form-group label {
+  flex: 1;
+}
+
+.mcq-container .input-field {
+  flex: 3;
+}
+
+.mcq-container .option-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.coding-container {
+  margin-top: 15px;
+}
+
+.coding-container .initial-code-label {
+  margin-bottom: 8px;
+  color: #555555;
+  font-weight: bold;
+}
+
+.monaco-editor-container {
+  height: 300px;
+  border: 1px solid #cccccc;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.btn-run {
+  background-color: #17a2b8;
+  color: #ffffff;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-top: 10px;
+}
+
+.btn-run:hover {
+  background-color: #138496;
+}
+
+.code-output {
+  background-color: #f8f9fa;
+  padding: 10px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  margin-top: 10px;
+  white-space: pre-wrap;
+}
+
+.editor-error {
+  color: red;
+  font-weight: bold;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .button-group {
+      flex-direction: column;
   }
-  
-  header {
-    background-color: #282c34;
-    padding: 20px;
-    color: white;
+
+  .mcq-container .form-group {
+      flex-direction: column;
+      align-items: flex-start;
   }
-  
-  nav button {
-    margin-right: 10px;
-    padding: 10px 20px;
-    font-size: 16px;
+
+  .mcq-container .input-field {
+      width: 100%;
   }
-  
-  #main-content {
-    padding: 20px;
+
+  .question-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
   }
-  
+
+  .monaco-editor-container {
+      height: 250px;
+  }
+}

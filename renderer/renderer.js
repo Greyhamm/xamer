@@ -1,46 +1,33 @@
 // renderer/renderer.js
-const createExamBtn = document.getElementById('create-exam-btn');
-const takeExamBtn = document.getElementById('take-exam-btn');
-const mainContent = document.getElementById('main-content');
+import ExamCreator from './components/ExamCreator.js';
+import ExamTaker from './components/ExamTaker.js';
 
-let ExamCreator, ExamTaker; // Will be loaded dynamically
-
-createExamBtn.addEventListener('click', async () => {
-  if (!ExamCreator) {
-    try {
-      const module = await import('./components/ExamCreator.js');
-      ExamCreator = module.default;
-    } catch (err) {
-      console.error('Failed to load ExamCreator.js:', err);
-      alert('Failed to load ExamCreator component.');
-      return;
-    }
-  }
-  mainContent.innerHTML = '';
-  const creator = new ExamCreator();
-  mainContent.appendChild(creator.render());
-});
-
-takeExamBtn.addEventListener('click', async () => {
-  if (!ExamTaker) {
-    try {
-      const module = await import('./components/ExamTaker.js');
-      ExamTaker = module.default;
-    } catch (err) {
-      console.error('Failed to load ExamTaker.js:', err);
-      alert('Failed to load ExamTaker component.');
-      return;
-    }
-  }
-  
-  mainContent.innerHTML = '';
-  const taker = new ExamTaker();
-  
+// Function to load ExamCreator
+function loadExamCreator() {
   try {
-    const rendered = await taker.render(); // Await the Promise
-    mainContent.appendChild(rendered); // Append the resolved Node
-  } catch (err) {
-    console.error('Failed to render ExamTaker:', err);
-    alert('Failed to render ExamTaker component.');
+    const examCreator = new ExamCreator();
+    const content = examCreator.render();
+    document.getElementById('main-content').innerHTML = ''; // Clear existing content
+    document.getElementById('main-content').appendChild(content);
+  } catch (error) {
+    console.error('Failed to load ExamCreator component.', error);
+    alert('Failed to load ExamCreator component.');
   }
-});
+}
+
+// Function to load ExamTaker
+async function loadExamTaker() {
+  try {
+    const examTaker = new ExamTaker();
+    const content = await examTaker.render(); // Await the Promise
+    document.getElementById('main-content').innerHTML = ''; // Clear existing content
+    document.getElementById('main-content').appendChild(content); // Append the resolved Node
+  } catch (error) {
+    console.error('Failed to load ExamTaker component.', error);
+    alert('Failed to load ExamTaker component.');
+  }
+}
+
+// Event Listeners for Buttons
+document.getElementById('create-exam-btn').addEventListener('click', loadExamCreator);
+document.getElementById('take-exam-btn').addEventListener('click', loadExamTaker);

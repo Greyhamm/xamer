@@ -1,4 +1,4 @@
-// models/CodingQuestion.js
+// renderer/models/CodingQuestion.js
 import { Question } from './Question.js';
 
 export class CodingQuestion extends Question {
@@ -6,6 +6,7 @@ export class CodingQuestion extends Question {
     super(data);
     this.type = 'Coding';
     this.language = data.language || 'javascript';
-    this.code = data.code || '// Write your code here';
+    this.initialCode = data.initialCode || '// Write your code here';
+    this.userCode = data.userCode || ''; // Captures participant's code
   }
 }

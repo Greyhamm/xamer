@@ -78,14 +78,14 @@ contextBridge.exposeInMainWorld('api', {
       throw error;
     }
   },
-  executeJava: async (code) => {
+  executeJava: async (userCode, initialCode) => { // Updated to accept initialCode
     try {
       const response = await fetch('http://localhost:3000/api/execute/java', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ userCode, initialCode }), // Send both codes
       });
       const data = await response.json();
       if (response.ok) {

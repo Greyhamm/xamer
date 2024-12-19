@@ -135,14 +135,16 @@ export default class ExamTaker {
         }
 
         const editorContainer = document.createElement('div');
-        editorContainer.style.height = '200px';
+        editorContainer.style.height = '300px'; // Increased height for better visibility
         questionDiv.appendChild(editorContainer);
 
         let monacoInstance;
         try {
+          // Combine initialCode and userCode if needed
+          const combinedCode = question.initialCode + '\n' + question.userCode;
           monacoInstance = new MonacoEditorComponent(editorContainer, {
             language: question.language,
-            value: question.code || '// Write your code here',
+            value: combinedCode,
           });
         } catch (err) {
           console.error('Failed to initialize Monaco Editor:', err);
@@ -166,17 +168,18 @@ export default class ExamTaker {
             return;
           }
 
-          const userCode = monacoInstance.getValue();
-          this.answers[index] = userCode;
+          // Retrieve the combined code from the editor
+          const combinedCode = monacoInstance.getValue();
+          this.answers[index] = combinedCode;
 
-          console.log(`Executing Code for Question ${index + 1}:`, userCode);
+          console.log(`Executing Code for Question ${index + 1}:`, combinedCode);
           console.log(`Selected Language: ${question.language}`);
 
           // Secure code execution using backend
           try {
             let response;
             if (question.language === 'javascript') {
-              response = await window.api.executeJavaScript(userCode);
+              response = await window.api.executeJavaScript(combinedCode);
               console.log(`Execution Response for Question ${index + 1}:`, response);
               
               // Update the frontend to display logs and result
@@ -189,13 +192,26 @@ export default class ExamTaker {
                 output.textContent += response.result;
               }
             } else if (question.language === 'python') {
-              response = await window.api.executePython(userCode);
+              response = await window.api.executePython(combinedCode);
               console.log(`Python Execution Response for Question ${index + 1}:`, response);
               
               // Update the frontend to display the result
               output.textContent = response.result || '';
             } else if (question.language === 'java') {
-              response = await window.api.executeJava(userCode);
+              // Split the combined code into initialCode and userCode based on a marker
+              const marker = '// START USER CODE';
+              const splitIndex = combinedCode.indexOf(marker);
+              let initialCode = '';
+              let userCode = '';
+              if (splitIndex !== -1) {
+                initialCode = combinedCode.substring(0, splitIndex).trim();
+                userCode = combinedCode.substring(splitIndex + marker.length).trim();
+              } else {
+                // If no marker, treat entire code as userCode
+                userCode = combinedCode.trim();
+              }
+
+              response = await window.api.executeJava(userCode, initialCode);
               console.log(`Java Execution Response for Question ${index + 1}:`, response);
               
               // Update the frontend to display the result

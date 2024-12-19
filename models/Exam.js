@@ -27,4 +27,8 @@ export class Exam {
         throw new Error(`Unknown question type: ${data.type}`);
     }
   }
+  removeQuestion(question) {
+    this.questions = this.questions.filter(q => q !== question);
+  }
 }
+
