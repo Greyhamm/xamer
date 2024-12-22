@@ -1,10 +1,11 @@
 // models/WrittenQuestion.js
 import { Question } from './Question.js';
 
-export class WrittenQuestion extends Question {
+export class WrittenQuestion {
   constructor(data = {}) {
-    super(data);
     this.type = 'Written';
-    // Additional properties can be added as needed
+    this.prompt = data.prompt || '';
+    this.media = data.media || null; // New field for media
   }
+
 }

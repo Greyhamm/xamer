@@ -98,5 +98,32 @@ contextBridge.exposeInMainWorld('api', {
       throw error;
     }
   },
+  // **Add the uploadMedia function**
+  uploadMedia: async (file) => {
+    try {
+      // Create a FormData object and append the file
+      const formData = new FormData();
+      formData.append('media', file);
+
+      // Send the POST request to the Express server
+      const response = await fetch('http://localhost:3000/api/uploadMedia', {
+        method: 'POST',
+        body: formData,
+      });
+
+      // Check if the response is OK (status in the range 200-299)
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to upload media.');
+      }
+
+      // Parse and return the response data
+      const data = await response.json();
+      return data; // Expected to contain { url: 'https://...' }
+    } catch (error) {
+      console.error('Error uploading media:', error);
+      throw error;
+    }
+  },
   // Add more APIs as needed
 });

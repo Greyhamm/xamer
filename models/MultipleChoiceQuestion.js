@@ -1,11 +1,13 @@
 // models/MultipleChoiceQuestion.js
 import { Question } from './Question.js';
 
-export class MultipleChoiceQuestion extends Question {
+export class MultipleChoiceQuestion {
   constructor(data = {}) {
-    super(data);
     this.type = 'MultipleChoice';
+    this.prompt = data.prompt || '';
     this.options = data.options || ['', '', '', ''];
-    this.correctOption = data.correctOption || 0;
+    this.correctOption = data.correctOption !== undefined ? data.correctOption : null;
+    this.media = data.media || null; // New field for media
   }
 }
+

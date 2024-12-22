@@ -1,4 +1,3 @@
-// backend/models/WrittenQuestion.js
 const mongoose = require('mongoose');
 const QuestionSchema = require('./Question');
 

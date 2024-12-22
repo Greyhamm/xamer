@@ -12,6 +12,7 @@ export default class ExamCreator {
     this.exam = new Exam();
     this.editorService = new EditorService();
     this.monacoEditors = new Map(); // To manage Monaco instances for coding questions
+    this.mediaFiles = new Map(); // To store media files temporarily
   }
 
   render() {
@@ -114,6 +115,9 @@ export default class ExamCreator {
 
     // Render Question Prompt Input
     div.appendChild(this.renderQuestionPrompt(question));
+
+    // Render Media Upload Section
+    div.appendChild(this.renderMediaUpload(question));
 
     // Render Specific Fields Based on Question Type
     switch (question.type) {
@@ -342,36 +346,78 @@ export default class ExamCreator {
     return languageContainer;
   }
 
-  renderSaveExamButton(questionsContainer) {
-    const saveExamBtn = DOMHelper.createElement('button', {
-      classes: ['btn', 'btn-save'],
-      text: 'Save Exam',
+  renderMediaUpload(question) {
+    const mediaContainer = DOMHelper.createElement('div', { classes: ['media-container'] });
+
+    const mediaLabel = DOMHelper.createElement('label', {
+      attributes: { for: `media-${question.id}` },
+      text: 'Add Media (Image or Video)',
+    });
+    mediaContainer.appendChild(mediaLabel);
+
+    const mediaInput = DOMHelper.createElement('input', {
+      attributes: {
+        type: 'file',
+        id: `media-${question.id}`,
+        accept: 'image/*,video/*',
+      },
+      classes: ['input-field'],
     });
 
-    saveExamBtn.addEventListener('click', async () => {
-      try {
-        // Validate Exam
-        const validationError = this.validateExam();
-        if (validationError) {
-          alert(`Validation Error: ${validationError}`);
-          return;
-        }
+    // Event Listener to Handle File Selection
+    mediaInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        // Optionally, validate file type and size here
+        // For simplicity, we'll assume the file is valid
 
-        const data = await ApiService.createExam(this.exam);
-        if (data.message) {
-          alert('Exam Saved Successfully!');
-          // Clear the form
-          this.clearForm(questionsContainer);
-        } else {
-          alert(`Error: ${data.error || 'Unknown error'}`);
-        }
-      } catch (err) {
-        console.error(err);
-        alert('Failed to save exam. Make sure the backend server is running.');
+        // Create a URL for preview
+        const fileURL = URL.createObjectURL(file);
+
+        // Update question media reference
+        question.media = {
+          name: file.name,
+          type: file.type.startsWith('image/') ? 'image' : 'video',
+          url: fileURL, // In a real application, you'd upload the file and store the URL from the server
+          file: file, // Store the File object for uploading
+        };
+
+        // Display Preview
+        this.displayMediaPreview(mediaContainer, question);
       }
     });
 
-    return saveExamBtn;
+    mediaContainer.appendChild(mediaInput);
+
+    return mediaContainer;
+  }
+
+  displayMediaPreview(mediaContainer, question) {
+    // Remove existing preview if any
+    const existingPreview = mediaContainer.querySelector('.media-preview');
+    if (existingPreview) {
+      existingPreview.remove();
+    }
+
+    if (question.media) {
+      const preview = DOMHelper.createElement('div', { classes: ['media-preview'] });
+
+      if (question.media.type === 'image') {
+        const img = DOMHelper.createElement('img', {
+          attributes: { src: question.media.url, alt: 'Question Image' },
+          classes: ['media-image'],
+        });
+        preview.appendChild(img);
+      } else if (question.media.type === 'video') {
+        const video = DOMHelper.createElement('video', {
+          attributes: { src: question.media.url, controls: true },
+          classes: ['media-video'],
+        });
+        preview.appendChild(video);
+      }
+
+      mediaContainer.appendChild(preview);
+    }
   }
 
   validateExam() {
@@ -388,6 +434,9 @@ export default class ExamCreator {
       if (!q.prompt.trim()) {
         return `Question ${i + 1} prompt cannot be empty.`;
       }
+
+      // Media validation (optional)
+      // For example, you can enforce that only certain types or sizes are allowed
 
       if (q.type === 'MultipleChoice') {
         for (let j = 0; j < q.options.length; j++) {
@@ -432,6 +481,67 @@ export default class ExamCreator {
       titleInput.value = '';
     }
   }
+
+  renderSaveExamButton(questionsContainer) { // Removed 'async' keyword
+    const saveExamBtn = DOMHelper.createElement('button', {
+      classes: ['btn', 'btn-save'],
+      text: 'Save Exam',
+    });
+
+    // Event Listener for Save Exam
+    saveExamBtn.addEventListener('click', async () => { // Handle async within the event
+      try {
+        // Validate Exam
+        const validationError = this.validateExam();
+        if (validationError) {
+          alert(`Validation Error: ${validationError}`);
+          return;
+        }
+
+        // Handle media uploads before creating the exam
+        await this.handleMediaUploads();
+
+        const data = await ApiService.createExam(this.exam);
+        if (data.message) {
+          alert('Exam Saved Successfully!');
+          // Clear the form
+          this.clearForm(questionsContainer);
+        } else {
+          alert(`Error: ${data.error || 'Unknown error'}`);
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Failed to save exam. Make sure the backend server is running.');
+      }
+    });
+
+    return saveExamBtn;
+  }
+
+  async handleMediaUploads() {
+    const uploadPromises = [];
+  
+    this.exam.questions.forEach((question) => {
+      if (question.media && question.media.file) {
+        console.log('Uploading media for question:', question.id, question.media.file);
+        const uploadPromise = ApiService.uploadMedia(question.media.file)
+          .then((response) => {
+            question.media.url = response.url;
+            delete question.media.file;
+          })
+          .catch((err) => {
+            console.error(`Failed to upload media for question ${question.id}:`, err);
+            throw new Error(`Failed to upload media for question ${question.id}.`);
+          });
+  
+        uploadPromises.push(uploadPromise);
+      }
+    });
+  
+    await Promise.all(uploadPromises);
+  }
+  
+  
 
   updateQuestionNumbers() {
     const questionElements = document.querySelectorAll('.questions-container .question');

@@ -1,12 +1,12 @@
 // renderer/models/CodingQuestion.js
 import { Question } from './Question.js';
-
-export class CodingQuestion extends Question {
+export class CodingQuestion {
   constructor(data = {}) {
-    super(data);
     this.type = 'Coding';
+    this.prompt = data.prompt || '';
     this.language = data.language || 'javascript';
-    this.initialCode = data.initialCode || '// Write your code here';
-    this.userCode = data.userCode || ''; // Captures participant's code
+    this.initialCode = data.initialCode || '';
+    this.media = data.media || null; // New field for media
   }
+
 }

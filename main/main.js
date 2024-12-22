@@ -7,6 +7,7 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const examRoutes = require('../backend/routes/examRoutes');
 const codeExecutionRoutes = require('../backend/routes/codeExecutionRoutes');
+const mediaRoutes = require('../backend/routes/media');
 
 // Enable live reload for Electron and the renderer process
 try {
@@ -35,6 +36,9 @@ mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true 
 // Use Exam Routes
 expressApp.use('/api', examRoutes);
 expressApp.use('/api', codeExecutionRoutes);
+expressApp.use('/api', mediaRoutes);
+expressApp.use('/uploads', express.static('uploads'));
+
 
 // Start Express Server
 expressApp.listen(EXPRESS_PORT, () => {
@@ -66,6 +70,7 @@ app.whenReady().then(() => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
+
 
 // Quit when all windows are closed, except on macOS
 app.on('window-all-closed', function () {

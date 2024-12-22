@@ -32,11 +32,14 @@ release/
 logs/
 *.log
 
+# Mongo
+uploads/*
+
 # Cache
 .cache/
 .npm/
 .eslintcache
-
+package-lock.json
 # Test coverage
 coverage/
 
@@ -45,3 +48,4 @@ coverage/
 *.temp
 .DS_Store
 Thumbs.db
+temp

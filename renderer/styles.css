@@ -251,3 +251,23 @@ nav button:hover {
       height: 250px;
   }
 }
+
+.media-container {
+  margin-top: 10px;
+}
+
+.media-preview img,
+.media-preview video {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin-top: 5px;
+}
+
+.question-media img,
+.question-media video {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin-top: 10px;
+}

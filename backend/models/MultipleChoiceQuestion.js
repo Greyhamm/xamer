@@ -1,4 +1,3 @@
-// backend/models/MultipleChoiceQuestion.js
 const mongoose = require('mongoose');
 const QuestionSchema = require('./Question');
 
