@@ -78,14 +78,14 @@ contextBridge.exposeInMainWorld('api', {
       throw error;
     }
   },
-  executeJava: async (userCode, initialCode) => { // Updated to accept initialCode
+  executeJava: async (code) => { // Updated to accept only 'code'
     try {
       const response = await fetch('http://localhost:3000/api/execute/java', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userCode, initialCode }), // Send both codes
+        body: JSON.stringify({ code }), // Send only 'code'
       });
       const data = await response.json();
       if (response.ok) {
@@ -98,7 +98,7 @@ contextBridge.exposeInMainWorld('api', {
       throw error;
     }
   },
-  // **Add the uploadMedia function**
+  // **Add the uploadMedia function remains unchanged**
   uploadMedia: async (file) => {
     try {
       // Create a FormData object and append the file

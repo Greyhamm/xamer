@@ -6,7 +6,7 @@ const path = require('path'); // Path module for handling file paths
 const { v4: uuidv4 } = require('uuid'); // UUID module for generating unique identifiers
 
 class CodeExecutionController {
-  // Existing JavaScript execution method
+  // Existing JavaScript execution method remains unchanged
   static executeJavaScript(req, res) {
     const { code } = req.body;
     console.log('Received JavaScript code for execution:', code);
@@ -54,7 +54,7 @@ class CodeExecutionController {
     }
   }
 
-  // Existing Python execution method
+  // Existing Python execution method remains unchanged
   static executePython(req, res) {
     const { code } = req.body;
     console.log('Received Python code for execution:', code);
@@ -85,7 +85,7 @@ class CodeExecutionController {
         }
       });
 
-      // Handle timeout
+      // Handle timeout and other errors
       pythonProcess.on('error', (err) => {
         console.error('Python Execution error:', err.message);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -97,105 +97,66 @@ class CodeExecutionController {
     }
   }
 
-   // Enhanced Java execution method supporting multiple classes and initial code
-  // Enhanced Java execution method supporting multiple classes and initial code
+  // Updated Java execution method to accept a single code submission
   static executeJava(req, res) {
-    const { initialCode, userCode } = req.body; // Expecting initialCode and userCode
+    const { code } = req.body; // Expecting a single 'code' field
     console.log('Received Java code for execution.');
 
     // Initialize temporary directory variable
     let tmpDir;
 
     try {
+      // Validate that code is provided
+      if (!code || !code.trim()) {
+        throw new Error('No Java code provided for execution.');
+      }
+
       // Generate a unique temporary directory for this execution
       tmpDir = path.join(__dirname, '../../temp', uuidv4());
 
       // Create the temporary directory
       fs.mkdirSync(tmpDir, { recursive: true });
 
-      // Function to extract public class names using regex
-      const extractPublicClasses = (code) => {
-        const regex = /public\s+class\s+(\w+)/g;
+      // Function to extract class declarations using regex
+      const extractClasses = (code) => {
+        const regex = /(?:(public)\s+)?class\s+(\w+)/g;
         let match;
-        const classNames = [];
+        const classes = [];
+
         while ((match = regex.exec(code)) !== null) {
-          classNames.push(match[1]);
+          const isPublic = !!match[1];
+          const className = match[2];
+          classes.push({ className, isPublic });
         }
-        return classNames;
+
+        return classes;
       };
 
-      // Function to extract all class declarations (public or not)
-      const extractAllClasses = (code) => {
-        const regex = /class\s+(\w+)/g;
-        let match;
-        const classNames = [];
-        while ((match = regex.exec(code)) !== null) {
-          classNames.push(match[1]);
-        }
-        return classNames;
-      };
+      // Extract all class declarations
+      const classes = extractClasses(code);
 
-      // Extract public class names from initialCode and userCode
-      const initialPublicClasses = extractPublicClasses(initialCode);
-      const userPublicClasses = extractPublicClasses(userCode);
-
-      // Extract all class names to handle non-public classes
-      const initialAllClasses = extractAllClasses(initialCode);
-      const userAllClasses = extractAllClasses(userCode);
+      if (classes.length === 0) {
+        throw new Error('No class declarations found in the Java code.');
+      }
 
       // Prepare a map to store className -> code
       const classCodeMap = {};
 
-      // Handle Initial Code
-      if (initialPublicClasses.length > 0) {
-        initialPublicClasses.forEach((className) => {
-          const regex = new RegExp(`public\\s+class\\s+${className}[\\s\\S]*?\\}`, 'g');
-          const match = initialCode.match(regex);
-          if (match) {
-            classCodeMap[className] = match[0];
-          }
-        });
-      } else if (initialAllClasses.length > 0) {
-        // If no public classes, assume entire code is a non-public class
-        initialAllClasses.forEach((className) => {
-          const regex = new RegExp(`class\\s+${className}[\\s\\S]*?\\}`, 'g');
-          const match = initialCode.match(regex);
-          if (match) {
-            classCodeMap[className] = match[0];
-          }
-        });
-      } else {
-        // If no class declarations, treat entire code as part of a default class
-        classCodeMap['InitialCode'] = initialCode;
-      }
-
-      // Handle User Code
-      if (userPublicClasses.length > 0) {
-        userPublicClasses.forEach((className) => {
-          const regex = new RegExp(`public\\s+class\\s+${className}[\\s\\S]*?\\}`, 'g');
-          const match = userCode.match(regex);
-          if (match) {
-            classCodeMap[className] = match[0];
-          }
-        });
-      } else if (userAllClasses.length > 0) {
-        // If no public classes, assume entire code is a non-public class
-        userAllClasses.forEach((className) => {
-          const regex = new RegExp(`class\\s+${className}[\\s\\S]*?\\}`, 'g');
-          const match = userCode.match(regex);
-          if (match) {
-            classCodeMap[className] = match[0];
-          }
-        });
-      } else {
-        // If no class declarations, treat entire code as part of a default class
-        classCodeMap['UserCode'] = userCode;
-      }
+      // Split the code into individual classes
+      // This simplistic approach assumes that classes are not nested and are well-formed
+      // For more complex scenarios, consider using a proper Java parser
+      classes.forEach(({ className }) => {
+        const classRegex = new RegExp(`(public\\s+)?class\\s+${className}[\\s\\S]*?(?=class\\s+|$)`, 'g');
+        const match = code.match(classRegex);
+        if (match && match.length > 0) {
+          classCodeMap[className] = match[0];
+        }
+      });
 
       // Write each class to its own .java file
-      for (const [className, code] of Object.entries(classCodeMap)) {
+      for (const [className, classCode] of Object.entries(classCodeMap)) {
         const filePath = path.join(tmpDir, `${className}.java`);
-        fs.writeFileSync(filePath, code);
+        fs.writeFileSync(filePath, classCode);
       }
 
       // Read all .java files in the temporary directory
@@ -206,7 +167,7 @@ class CodeExecutionController {
         throw new Error('No Java files found to compile.');
       }
 
-      // Compile all Java files by passing each filename as an argument
+      // Compile all Java files
       const javacProcess = spawn('javac', javaFiles, { cwd: tmpDir });
 
       let compileError = '';
@@ -287,7 +248,7 @@ class CodeExecutionController {
 
     } catch (error) {
       console.error('Java Execution error:', error.message);
-      res.status(500).json({ error: 'Internal Server Error' });
+      res.status(500).json({ error: error.message });
 
       // Cleanup if temporary directory was created
       if (tmpDir && fs.existsSync(tmpDir)) {
@@ -295,6 +256,7 @@ class CodeExecutionController {
       }
     }
   }
+
   // Implement execution for other languages as needed
 }
 

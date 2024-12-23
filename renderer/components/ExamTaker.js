@@ -223,12 +223,12 @@ export default class ExamTaker {
       parentDiv.appendChild(error);
       return;
     }
-
+  
     const editorContainer = DOMHelper.createElement('div', {
       classes: ['monaco-editor-container'],
     });
     parentDiv.appendChild(editorContainer);
-
+  
     let monacoInstance;
     try {
       // Initialize Monaco Editor with user code if exists
@@ -245,39 +245,39 @@ export default class ExamTaker {
       });
       parentDiv.appendChild(error);
     }
-
+  
     const runBtn = DOMHelper.createElement('button', {
       classes: ['btn', 'btn-run'],
       text: 'Run Code',
     });
     parentDiv.appendChild(runBtn);
-
+  
     const output = DOMHelper.createElement('pre', {
       classes: ['code-output'],
     });
     parentDiv.appendChild(output);
-
+  
     // Run Button Event Listener
     runBtn.addEventListener('click', async () => {
       if (!monacoInstance) {
         output.textContent = 'Code editor is not initialized.';
         return;
       }
-
+  
       // Retrieve the code from the editor
       const userCode = monacoInstance.getValue();
       this.answers[index] = userCode;
-
+  
       console.log(`Executing Code for Question ${index + 1}:`, userCode);
       console.log(`Selected Language: ${question.language}`);
-
+  
       // Secure code execution using backend
       try {
         let response;
         if (question.language === 'javascript') {
           response = await window.api.executeJavaScript(userCode);
           console.log(`Execution Response for Question ${index + 1}:`, response);
-
+  
           // Display logs and result
           output.textContent = '';
           if (response.logs && response.logs.length > 0) {
@@ -289,26 +289,14 @@ export default class ExamTaker {
         } else if (question.language === 'python') {
           response = await window.api.executePython(userCode);
           console.log(`Python Execution Response for Question ${index + 1}:`, response);
-
+  
           // Display the result
           output.textContent = response.result || '';
         } else if (question.language === 'java') {
-          // Split the code into initialCode and userCode based on a marker
-          const marker = '// START USER CODE';
-          const splitIndex = userCode.indexOf(marker);
-          let initialCode = '';
-          let userCodePart = '';
-          if (splitIndex !== -1) {
-            initialCode = userCode.substring(0, splitIndex).trim();
-            userCodePart = userCode.substring(splitIndex + marker.length).trim();
-          } else {
-            // If no marker, treat entire code as userCode
-            userCodePart = userCode.trim();
-          }
-
-          response = await window.api.executeJava(userCodePart, initialCode);
+          // Send the entire code as a single 'code' field
+          response = await window.api.executeJava(userCode);
           console.log(`Java Execution Response for Question ${index + 1}:`, response);
-
+  
           // Display the result
           output.textContent = response.result || '';
         } else {
