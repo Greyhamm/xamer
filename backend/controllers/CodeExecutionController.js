@@ -97,7 +97,7 @@ class CodeExecutionController {
     }
   }
 
-  // Updated Java execution method to accept a single code submission
+  // Updated Java execution method to handle multiple classes
   static executeJava(req, res) {
     const { code } = req.body; // Expecting a single 'code' field
     console.log('Received Java code for execution.');
@@ -117,47 +117,37 @@ class CodeExecutionController {
       // Create the temporary directory
       fs.mkdirSync(tmpDir, { recursive: true });
 
-      // Function to extract class declarations using regex
-      const extractClasses = (code) => {
-        const regex = /(?:(public)\s+)?class\s+(\w+)/g;
-        let match;
-        const classes = [];
+      // Split the code into individual class blocks
+      const classBlocks = splitClasses(code);
 
-        while ((match = regex.exec(code)) !== null) {
-          const isPublic = !!match[1];
-          const className = match[2];
-          classes.push({ className, isPublic });
-        }
-
-        return classes;
-      };
-
-      // Extract all class declarations
-      const classes = extractClasses(code);
-
-      if (classes.length === 0) {
+      if (classBlocks.length === 0) {
         throw new Error('No class declarations found in the Java code.');
       }
 
-      // Prepare a map to store className -> code
-      const classCodeMap = {};
+      // Validate that there is at least one class with a main method
+      const classesWithMain = classBlocks.filter(block => block.includes('public static void main'));
+      if (classesWithMain.length === 0) {
+        throw new Error('No class with main method found for execution.');
+      }
 
-      // Split the code into individual classes
-      // This simplistic approach assumes that classes are not nested and are well-formed
-      // For more complex scenarios, consider using a proper Java parser
-      classes.forEach(({ className }) => {
-        const classRegex = new RegExp(`(public\\s+)?class\\s+${className}[\\s\\S]*?(?=class\\s+|$)`, 'g');
-        const match = code.match(classRegex);
-        if (match && match.length > 0) {
-          classCodeMap[className] = match[0];
+      // Enforce only one public class per file as per Java rules
+      classBlocks.forEach(block => {
+        const publicClassCount = (block.match(/public\s+class\s+\w+/g) || []).length;
+        if (publicClassCount > 1) {
+          throw new Error('A class cannot have more than one public class declaration.');
         }
       });
 
       // Write each class to its own .java file
-      for (const [className, classCode] of Object.entries(classCodeMap)) {
+      classBlocks.forEach(block => {
+        const classNameMatch = block.match(/public\s+class\s+(\w+)/) || block.match(/class\s+(\w+)/);
+        if (!classNameMatch) {
+          throw new Error('Unable to determine class name from the code block.');
+        }
+        const className = classNameMatch[1];
         const filePath = path.join(tmpDir, `${className}.java`);
-        fs.writeFileSync(filePath, classCode);
-      }
+        fs.writeFileSync(filePath, block);
+      });
 
       // Read all .java files in the temporary directory
       const allFiles = fs.readdirSync(tmpDir);
@@ -258,6 +248,99 @@ class CodeExecutionController {
   }
 
   // Implement execution for other languages as needed
+}
+
+// Helper function to split Java code into individual class blocks
+function splitClasses(code) {
+  const classes = [];
+  const classRegex = /(?:public\s+)?class\s+\w+/g;
+  let match;
+  let lastIndex = 0;
+
+  const regexMatches = [];
+  while ((match = classRegex.exec(code)) !== null) {
+    regexMatches.push({ index: match.index, name: match[0] });
+  }
+
+  for (let i = 0; i < regexMatches.length; i++) {
+    const currentMatch = regexMatches[i];
+    const nextMatch = regexMatches[i + 1];
+
+    const classStart = currentMatch.index;
+    let classEnd;
+
+    if (nextMatch) {
+      classEnd = nextMatch.index;
+    } else {
+      classEnd = code.length;
+    }
+
+    const classCode = code.substring(classStart, classEnd).trim();
+
+    // Ensure braces are balanced
+    if (isBracesBalanced(classCode)) {
+      classes.push(classCode);
+    } else {
+      console.warn(`Unbalanced braces detected in class starting at index ${classStart}. Attempting to fix.`);
+      const fixedClassCode = fixUnbalancedBraces(code, classStart, classEnd);
+      if (fixedClassCode) {
+        classes.push(fixedClassCode);
+      } else {
+        console.error('Unable to fix unbalanced braces.');
+      }
+    }
+  }
+
+  return classes;
+}
+
+// Helper function to check if braces are balanced
+function isBracesBalanced(code) {
+  let stack = [];
+  for (let char of code) {
+    if (char === '{') {
+      stack.push(char);
+    } else if (char === '}') {
+      if (stack.length === 0) {
+        return false;
+      }
+      stack.pop();
+    }
+  }
+  return stack.length === 0;
+}
+
+// Helper function to fix unbalanced braces by adding missing closing braces
+function fixUnbalancedBraces(code, start, end) {
+  const classCode = code.substring(start, end).trim();
+  let stack = [];
+  let fixedCode = classCode;
+
+  for (let char of classCode) {
+    if (char === '{') {
+      stack.push(char);
+    } else if (char === '}') {
+      if (stack.length > 0) {
+        stack.pop();
+      } else {
+        // Extra closing brace found, remove it
+        fixedCode = fixedCode.replace('}', '');
+      }
+    }
+  }
+
+  // Add missing closing braces
+  while (stack.length > 0) {
+    fixedCode += '}';
+    stack.pop();
+  }
+
+  // Re-validate
+  if (isBracesBalanced(fixedCode)) {
+    return fixedCode;
+  } else {
+    return null;
+  }
 }
 
 module.exports = CodeExecutionController;
