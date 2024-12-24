@@ -557,3 +557,94 @@ nav button:hover {
   background: #f8d7da;
   border-radius: 4px;
 }
+
+/* Add to your styles.css */
+.grading-container {
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.grading-header {
+  margin-bottom: 30px;
+}
+
+.grading-title {
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.student-info {
+  color: #666;
+  font-size: 1.1em;
+}
+
+.question-grading-section {
+  background: white;
+  padding: 20px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.question-title {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.student-answer {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.answer-label {
+  margin-bottom: 10px;
+  color: #666;
+  font-size: 0.9em;
+}
+
+.code-answer {
+  background: #f1f3f5;
+  padding: 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.grading-inputs {
+  display: grid;
+  gap: 15px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.score-input {
+  width: 100px;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.feedback-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+}
+
+.submit-grades {
+  margin-top: 20px;
+  width: 100%;
+  padding: 12px;
+}
+
+.back-button {
+  margin-top: 15px;
+  width: 100%;
+}

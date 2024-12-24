@@ -1,6 +1,6 @@
 // renderer/components/Submissions/SubmissionsView.js
 import DOMHelper from '../../helpers/DOMHelper.js';
-
+import GradingView from './GradingView.js';
 export default class SubmissionsView {
   constructor() {
     this.submissions = [];
@@ -115,21 +115,27 @@ export default class SubmissionsView {
     return container;
   }
 
-  handleSubmissionAction(submission) {
-    if (submission.status === 'graded') {
-      this.reviewSubmission(submission);
-    } else {
-      this.gradeSubmission(submission);
+    // Update the handleSubmissionAction method
+    handleSubmissionAction(submission) {
+        if (submission.status === 'graded') {
+        this.reviewSubmission(submission);
+        } else {
+        this.gradeSubmission(submission);
+        }
     }
-  }
 
   reviewSubmission(submission) {
-    // Implement review functionality
-    console.log('Reviewing submission:', submission);
+    // For now, use the same grading view but in read-only mode
+    const gradingView = new GradingView(submission);
+    const mainContent = document.getElementById('main-content');
+    mainContent.innerHTML = '';
+    mainContent.appendChild(gradingView.render());
   }
-
+  
   gradeSubmission(submission) {
-    // Implement grading functionality
-    console.log('Grading submission:', submission);
+    const gradingView = new GradingView(submission);
+    const mainContent = document.getElementById('main-content');
+    mainContent.innerHTML = '';
+    mainContent.appendChild(gradingView.render());
   }
 }

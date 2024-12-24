@@ -134,6 +134,7 @@ submitExam: async (examId, answers) => {
     }
   },
 
+  // Add to preload.js
   gradeSubmission: async (submissionId, grades) => {
     try {
       const response = await fetch(`http://localhost:3000/api/submissions/${submissionId}/grade`, {
@@ -144,10 +145,12 @@ submitExam: async (examId, answers) => {
         },
         body: JSON.stringify({ grades }),
       });
+
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to grade submission');
+        throw new Error(error.message || 'Failed to grade submission');
       }
+
       return response.json();
     } catch (error) {
       console.error('Error grading submission:', error);

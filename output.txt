@@ -1,0 +1,1312 @@
+📁 .
+  📁 backend
+    📁 controllers
+      📄 CodeExecutionController.js
+
+=== File: .//backend/controllers/CodeExecutionController.js ===
+Content:
+// backend/controllers/CodeExecutionController.js
+const { VM } = require('vm2');
+const { spawn } = require('child_process');
+
+class CodeExecutionController {
+  // Existing JavaScript execution method
+  static executeJavaScript(req, res) {
+    const { code } = req.body;
+    console.log('Received JavaScript code for execution:', code);
+
+    let logs = [];
+
+    const vm = new VM({
+      timeout: 1000,
+      sandbox: {
+        console: {
+          log: (...args) => {
+            const log = args.join(' ');
+            console.log(`console.log: ${log}`);
+            logs.push(log);
+          }
+        }
+      }
+    });
+
+    try {
+      const result = vm.run(code);
+      
+      // Prepare the response with separate logs and result
+      let responsePayload = {};
+
+      if (logs.length > 0) {
+        responsePayload.logs = logs;
+      }
+
+      if (result !== undefined) {
+        responsePayload.result = String(result);
+      }
+
+      // For scenarios where there's only logs or only result
+      if (logs.length > 0 && result === undefined) {
+        responsePayload.result = '';
+      }
+
+      console.log('JavaScript Execution output:', responsePayload);
+
+      res.status(200).json(responsePayload);
+    } catch (error) {
+      console.error('JavaScript Execution error:', error.message);
+      res.status(400).json({ error: error.message });
+    }
+  }
+
+  // New Python execution method
+  static executePython(req, res) {
+    const { code } = req.body;
+    console.log('Received Python code for execution:', code);
+
+    try {
+      // Spawn a Python process
+      const pythonProcess = spawn('python', ['-c', code]);
+
+      let stdout = '';
+      let stderr = '';
+
+      // Capture standard output
+      pythonProcess.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      // Capture standard error
+      pythonProcess.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      // Handle process exit
+      pythonProcess.on('close', (codeExit) => {
+        if (codeExit === 0) {
+          res.status(200).json({ result: stdout.trim() });
+        } else {
+          res.status(400).json({ error: stderr.trim() });
+        }
+      });
+
+    } catch (error) {
+      console.error('Python Execution error:', error.message);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
+
+  // New Java execution method
+  static executeJava(req, res) {
+    const { code } = req.body;
+    console.log('Received Java code for execution.');
+
+    try {
+      // Java requires compiling the code before execution.
+      // We'll wrap the user's code inside a class with a main method.
+
+      const wrappedCode = `
+      public class UserCode {
+          public static void main(String[] args) throws Exception {
+              ${code}
+          }
+      }`;
+
+      const fs = require('fs');
+      const path = require('path');
+      const tmpDir = path.join(__dirname, '../../temp');
+      
+      // Ensure the temp directory exists
+      if (!fs.existsSync(tmpDir)){
+          fs.mkdirSync(tmpDir);
+      }
+
+      const filePath = path.join(tmpDir, 'UserCode.java');
+
+      // Write the code to a temporary Java file
+      fs.writeFileSync(filePath, wrappedCode);
+
+      // Spawn a Java compiler process
+      const javacProcess = spawn('javac', [filePath]);
+
+      let compileError = '';
+
+      javacProcess.stderr.on('data', (data) => {
+        compileError += data.toString();
+      });
+
+      javacProcess.on('close', (codeExit) => {
+        if (codeExit !== 0) {
+          // Compilation error
+          res.status(400).json({ error: compileError.trim() });
+        } else {
+          // Compilation successful, execute the program
+          const javaProcess = spawn('java', ['-cp', tmpDir, 'UserCode']);
+
+          let stdout = '';
+          let stderr = '';
+
+          javaProcess.stdout.on('data', (data) => {
+            stdout += data.toString();
+          });
+
+          javaProcess.stderr.on('data', (data) => {
+            stderr += data.toString();
+          });
+
+          javaProcess.on('close', (codeExec) => {
+            // Clean up the temporary files
+            fs.unlinkSync(filePath);
+            fs.unlinkSync(path.join(tmpDir, 'UserCode.class'));
+
+            if (codeExec === 0) {
+              res.status(200).json({ result: stdout.trim() });
+            } else {
+              res.status(400).json({ error: stderr.trim() });
+            }
+          });
+        }
+      });
+
+    } catch (error) {
+      console.error('Java Execution error:', error.message);
+      res.status(500).json({ error: 'Internal Server Error' });
+    }
+  }
+
+  // Implement execution for other languages as needed
+}
+
+module.exports = CodeExecutionController;
+
+=== End of .//backend/controllers/CodeExecutionController.js ===
+
+      📄 ExamController.js
+
+=== File: .//backend/controllers/ExamController.js ===
+Content:
+// backend/controllers/ExamController.js
+const Exam = require('../models/Exam');
+const MultipleChoiceQuestion = require('../models/MultipleChoiceQuestion');
+const WrittenQuestion = require('../models/WrittenQuestion');
+const CodingQuestion = require('../models/CodingQuestion');
+
+class ExamController {
+  // Create a new exam
+  static async createExam(req, res) {
+    try {
+      const { title, questions } = req.body;
+      const exam = new Exam({ title, questionsTypeModel: [] });
+
+      for (const q of questions) {
+        let question;
+        switch (q.type) {
+          case 'MultipleChoice':
+            question = new MultipleChoiceQuestion(q);
+            break;
+          case 'Written':
+            question = new WrittenQuestion(q);
+            break;
+          case 'Coding':
+            question = new CodingQuestion(q);
+            break;
+          default:
+            return res.status(400).json({ message: `Unknown question type: ${q.type}` });
+        }
+        await question.save();
+        exam.questions.push(question._id);
+        exam.questionsTypeModel.push(question.constructor.modelName);
+      }
+
+      await exam.save();
+      res.status(201).json({ message: 'Exam created successfully', exam });
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Server Error' });
+    }
+  }
+
+  // Get all exams
+  static async getAllExams(req, res) {
+    try {
+      const exams = await Exam.find().populate('questions');
+      res.status(200).json(exams);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Server Error' });
+    }
+  }
+
+  // Get a specific exam by ID
+  static async getExamById(req, res) {
+    try {
+      const { id } = req.params;
+      const exam = await Exam.findById(id).populate('questions');
+      if (!exam) {
+        return res.status(404).json({ message: 'Exam not found' });
+      }
+      res.status(200).json(exam);
+    } catch (error) {
+      console.error(error);
+      res.status(500).json({ message: 'Server Error' });
+    }
+  }
+}
+
+module.exports = ExamController;
+
+=== End of .//backend/controllers/ExamController.js ===
+
+    📁 models
+      📄 CodingQuestion.js
+
+=== File: .//backend/models/CodingQuestion.js ===
+Content:
+// backend/models/CodingQuestion.js
+const mongoose = require('mongoose');
+const QuestionSchema = require('./Question');
+
+const CodingQuestionSchema = new mongoose.Schema({
+  ...QuestionSchema.obj,
+  language: { type: String, required: true, enum: ['javascript', 'python', 'java'] },
+  code: { type: String, required: true },
+});
+
+module.exports = mongoose.model('CodingQuestion', CodingQuestionSchema);
+
+=== End of .//backend/models/CodingQuestion.js ===
+
+      📄 Exam.js
+
+=== File: .//backend/models/Exam.js ===
+Content:
+// backend/models/Exam.js
+const mongoose = require('mongoose');
+
+const ExamSchema = new mongoose.Schema({
+  title: { type: String, required: true },
+  questions: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      refPath: 'questionsTypeModel',
+    },
+  ],
+  questionsTypeModel: [
+    {
+      type: String,
+      required: true,
+      enum: ['MultipleChoiceQuestion', 'WrittenQuestion', 'CodingQuestion'],
+    },
+  ],
+});
+
+module.exports = mongoose.model('Exam', ExamSchema);
+
+=== End of .//backend/models/Exam.js ===
+
+      📄 MultipleChoiceQuestion.js
+
+=== File: .//backend/models/MultipleChoiceQuestion.js ===
+Content:
+// backend/models/MultipleChoiceQuestion.js
+const mongoose = require('mongoose');
+const QuestionSchema = require('./Question');
+
+const MultipleChoiceQuestionSchema = new mongoose.Schema({
+  ...QuestionSchema.obj,
+  options: [{ type: String, required: true }],
+  correctOption: { type: Number, required: true },
+});
+
+module.exports = mongoose.model('MultipleChoiceQuestion', MultipleChoiceQuestionSchema);
+
+=== End of .//backend/models/MultipleChoiceQuestion.js ===
+
+      📄 Question.js
+
+=== File: .//backend/models/Question.js ===
+Content:
+// backend/models/Question.js
+const mongoose = require('mongoose');
+
+const QuestionSchema = new mongoose.Schema({
+  prompt: { type: String, required: true },
+  type: { type: String, required: true, enum: ['MultipleChoice', 'Written', 'Coding'] },
+});
+
+module.exports = QuestionSchema;
+
+=== End of .//backend/models/Question.js ===
+
+      📄 WrittenQuestion.js
+
+=== File: .//backend/models/WrittenQuestion.js ===
+Content:
+// backend/models/WrittenQuestion.js
+const mongoose = require('mongoose');
+const QuestionSchema = require('./Question');
+
+const WrittenQuestionSchema = new mongoose.Schema({
+  ...QuestionSchema.obj,
+  // Add additional fields if necessary
+});
+
+module.exports = mongoose.model('WrittenQuestion', WrittenQuestionSchema);
+
+=== End of .//backend/models/WrittenQuestion.js ===
+
+    📁 routes
+      📄 codeExecutionRoutes.js
+
+=== File: .//backend/routes/codeExecutionRoutes.js ===
+Content:
+// backend/routes/codeExecutionRoutes.js
+const express = require('express');
+const router = express.Router();
+const CodeExecutionController = require('../controllers/CodeExecutionController');
+
+// Route for executing JavaScript code
+router.post('/execute/javascript', CodeExecutionController.executeJavaScript);
+
+// Route for executing Python code
+router.post('/execute/python', CodeExecutionController.executePython);
+
+// Route for executing Java code
+router.post('/execute/java', CodeExecutionController.executeJava);
+
+// Add routes for other languages as needed
+
+module.exports = router;
+
+=== End of .//backend/routes/codeExecutionRoutes.js ===
+
+      📄 examRoutes.js
+
+=== File: .//backend/routes/examRoutes.js ===
+Content:
+// backend/routes/examRoutes.js
+const express = require('express');
+const router = express.Router();
+const ExamController = require('../controllers/ExamController');
+
+// Create a new exam
+router.post('/exams', ExamController.createExam);
+
+// Get all exams
+router.get('/exams', ExamController.getAllExams);
+
+// Get a specific exam by ID
+router.get('/exams/:id', ExamController.getExamById);
+
+module.exports = router;
+
+=== End of .//backend/routes/examRoutes.js ===
+
+  📁 main
+    📄 main.js
+
+=== File: .//main/main.js ===
+Content:
+// main/main.js
+const { app, BrowserWindow } = require('electron');
+const path = require('path');
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const mongoose = require('mongoose');
+const examRoutes = require('../backend/routes/examRoutes');
+const codeExecutionRoutes = require('../backend/routes/codeExecutionRoutes');
+
+// Enable live reload for Electron and the renderer process
+try {
+  require('electron-reload')(__dirname, {
+    electron: path.join(__dirname, '..', 'node_modules', '.bin', 'electron'),
+    awaitWriteFinish: true,
+  });
+} catch (_) {
+  console.log('Electron-reload not enabled');
+}
+
+// Initialize Express App
+const expressApp = express();
+const EXPRESS_PORT = 3000;
+
+// Middleware
+expressApp.use(cors());
+expressApp.use(bodyParser.json());
+
+// Connect to MongoDB
+const MONGODB_URI = 'mongodb://localhost:27017/electron_exam_app'; // Replace with your MongoDB URI
+mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
+
+// Use Exam Routes
+expressApp.use('/api', examRoutes);
+expressApp.use('/api', codeExecutionRoutes);
+
+// Start Express Server
+expressApp.listen(EXPRESS_PORT, () => {
+  console.log(`Express server running on http://localhost:${EXPRESS_PORT}`);
+});
+
+function createWindow() {
+  const win = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'), // Correct path to preload.js
+      nodeIntegration: false, // Disabled for security
+      contextIsolation: true, // Enabled
+    },
+  });
+
+  win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+
+  // Uncomment the following line to open DevTools by default
+  // win.webContents.openDevTools();
+}
+
+app.whenReady().then(() => {
+  createWindow();
+
+  // macOS specific behavior
+  app.on('activate', function () {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+});
+
+// Quit when all windows are closed, except on macOS
+app.on('window-all-closed', function () {
+  if (process.platform !== 'darwin') app.quit();
+});
+
+=== End of .//main/main.js ===
+
+    📄 preload.js
+
+=== File: .//main/preload.js ===
+Content:
+// main/preload.js
+const { contextBridge } = require('electron');
+
+contextBridge.exposeInMainWorld('api', {
+  createExam: async (examData) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/exams', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(examData),
+      });
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error creating exam:', error);
+      throw error;
+    }
+  },
+  getExams: async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/exams');
+      const exams = await response.json();
+      return exams;
+    } catch (error) {
+      console.error('Error fetching exams:', error);
+      throw error;
+    }
+  },
+  getExamById: async (id) => {
+    try {
+      const response = await fetch(`http://localhost:3000/api/exams/${id}`);
+      const exam = await response.json();
+      return exam;
+    } catch (error) {
+      console.error('Error fetching exam:', error);
+      throw error;
+    }
+  },
+  executeJavaScript: async (code) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/execute/javascript', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        return data; // Contains { logs: [...], result: '...' }
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Error executing JavaScript code:', error);
+      throw error;
+    }
+  },
+  executePython: async (code) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/execute/python', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        return data; // Contains { result: '...' }
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Error executing Python code:', error);
+      throw error;
+    }
+  },
+  executeJava: async (code) => {
+    try {
+      const response = await fetch('http://localhost:3000/api/execute/java', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        return data; // Contains { result: '...' }
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Error executing Java code:', error);
+      throw error;
+    }
+  },
+  // Add more APIs as needed
+});
+
+=== End of .//main/preload.js ===
+
+  📁 models
+    📄 CodingQuestion.js
+
+=== File: .//models/CodingQuestion.js ===
+Content:
+// models/CodingQuestion.js
+import { Question } from './Question.js';
+
+export class CodingQuestion extends Question {
+  constructor(data = {}) {
+    super(data);
+    this.type = 'Coding';
+    this.language = data.language || 'javascript';
+    this.code = data.code || '// Write your code here';
+  }
+}
+
+=== End of .//models/CodingQuestion.js ===
+
+    📄 Exam.js
+
+=== File: .//models/Exam.js ===
+Content:
+// renderer/models/Exam.js
+import { MultipleChoiceQuestion } from './MultipleChoiceQuestion.js';
+import { WrittenQuestion } from './WrittenQuestion.js';
+import { CodingQuestion } from './CodingQuestion.js';
+
+export class Exam {
+  constructor(data = {}) {
+    this.title = data.title || '';
+    this.questions = data.questions
+      ? data.questions.map((q) => Exam.deserializeQuestion(q))
+      : [];
+  }
+
+  addQuestion(question) {
+    this.questions.push(question);
+  }
+
+  static deserializeQuestion(data) {
+    switch (data.type) {
+      case 'MultipleChoice':
+        return new MultipleChoiceQuestion(data);
+      case 'Written':
+        return new WrittenQuestion(data);
+      case 'Coding':
+        return new CodingQuestion(data);
+      default:
+        throw new Error(`Unknown question type: ${data.type}`);
+    }
+  }
+}
+
+=== End of .//models/Exam.js ===
+
+    📄 MultipleChoiceQuestion.js
+
+=== File: .//models/MultipleChoiceQuestion.js ===
+Content:
+// models/MultipleChoiceQuestion.js
+import { Question } from './Question.js';
+
+export class MultipleChoiceQuestion extends Question {
+  constructor(data = {}) {
+    super(data);
+    this.type = 'MultipleChoice';
+    this.options = data.options || ['', '', '', ''];
+    this.correctOption = data.correctOption || 0;
+  }
+}
+
+=== End of .//models/MultipleChoiceQuestion.js ===
+
+    📄 Question.js
+
+=== File: .//models/Question.js ===
+Content:
+// models/Question.js
+export class Question {
+    constructor(data = {}) {
+      this.prompt = data.prompt || '';
+      this.type = data.type || 'Generic';
+    }
+  }
+  
+=== End of .//models/Question.js ===
+
+    📄 WrittenQuestion.js
+
+=== File: .//models/WrittenQuestion.js ===
+Content:
+// models/WrittenQuestion.js
+import { Question } from './Question.js';
+
+export class WrittenQuestion extends Question {
+  constructor(data = {}) {
+    super(data);
+    this.type = 'Written';
+    // Additional properties can be added as needed
+  }
+}
+
+=== End of .//models/WrittenQuestion.js ===
+
+  📄 package.json
+
+=== File: .//package.json ===
+Content:
+{
+  "name": "electron-exam-app",
+  "version": "1.0.0",
+  "description": "An Electron app for creating and taking exams",
+  "main": "main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "package": "electron-packager . ElectronExamApp --platform=darwin --arch=x64 --overwrite"
+  },
+  "dependencies": {
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "electron": "^25.3.0",
+    "express": "^4.21.2",
+    "monaco-editor": "^0.33.0",
+    "mongoose": "^7.8.3",
+    "vm2": "^3.9.19"
+  },
+  "devDependencies": {
+    "electron-packager": "^17.1.1",
+    "electron-reload": "^1.5.0"
+  }
+}
+
+=== End of .//package.json ===
+
+  📁 renderer
+    📁 components
+      📄 ExamCreator.js
+
+=== File: .//renderer/components/ExamCreator.js ===
+Content:
+// renderer/components/ExamCreator.js
+import { Exam } from '../../models/Exam.js';
+import { MultipleChoiceQuestion } from '../../models/MultipleChoiceQuestion.js';
+import { WrittenQuestion } from '../../models/WrittenQuestion.js';
+import { CodingQuestion } from '../../models/CodingQuestion.js';
+export default class ExamCreator {
+  constructor() {
+    this.exam = new Exam();
+  }
+
+  render() {
+    const container = document.createElement('div');
+
+    const titleInput = document.createElement('input');
+    titleInput.type = 'text';
+    titleInput.placeholder = 'Exam Title';
+    titleInput.addEventListener('input', (e) => {
+      this.exam.title = e.target.value;
+    });
+    container.appendChild(titleInput);
+
+    const addMCQBtn = document.createElement('button');
+    addMCQBtn.textContent = 'Add Multiple Choice Question';
+    container.appendChild(addMCQBtn);
+
+    const addWrittenBtn = document.createElement('button');
+    addWrittenBtn.textContent = 'Add Written Question';
+    container.appendChild(addWrittenBtn);
+
+    const addCodingBtn = document.createElement('button');
+    addCodingBtn.textContent = 'Add Coding Question';
+    container.appendChild(addCodingBtn);
+
+    const saveExamBtn = document.createElement('button');
+    saveExamBtn.textContent = 'Save Exam';
+    container.appendChild(saveExamBtn);
+
+    const questionsContainer = document.createElement('div');
+    container.appendChild(questionsContainer);
+
+    addMCQBtn.addEventListener('click', () => {
+      const question = new MultipleChoiceQuestion();
+      this.exam.addQuestion(question);
+      questionsContainer.appendChild(this.createQuestionElement(question));
+    });
+
+    addWrittenBtn.addEventListener('click', () => {
+      const question = new WrittenQuestion();
+      this.exam.addQuestion(question);
+      questionsContainer.appendChild(this.createQuestionElement(question));
+    });
+
+    addCodingBtn.addEventListener('click', () => {
+      const question = new CodingQuestion();
+      this.exam.addQuestion(question);
+      questionsContainer.appendChild(this.createQuestionElement(question));
+    });
+
+    saveExamBtn.addEventListener('click', async () => {
+      try {
+        const data = await window.api.createExam(this.exam);
+        if (data.message) {
+          alert('Exam Saved Successfully!');
+          // Optionally, clear the form
+          this.exam = new Exam();
+          questionsContainer.innerHTML = '';
+          titleInput.value = '';
+        } else {
+          alert(`Error: ${data.error || 'Unknown error'}`);
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Failed to save exam. Make sure the backend server is running.');
+      }
+    });
+
+    return container;
+  }
+
+  createQuestionElement(question) {
+    const div = document.createElement('div');
+    div.className = 'question';
+
+    const promptInput = document.createElement('input');
+    promptInput.type = 'text';
+    promptInput.placeholder = 'Question Prompt';
+    promptInput.value = question.prompt;
+    promptInput.addEventListener('input', (e) => {
+      question.prompt = e.target.value;
+    });
+    div.appendChild(promptInput);
+
+    if (question instanceof MultipleChoiceQuestion) {
+      // Add options
+      for (let i = 0; i < 4; i++) {
+        const optionInput = document.createElement('input');
+        optionInput.type = 'text';
+        optionInput.placeholder = `Option ${i + 1}`;
+        optionInput.value = question.options[i] || '';
+        optionInput.addEventListener('input', (e) => {
+          question.options[i] = e.target.value;
+        });
+        div.appendChild(optionInput);
+      }
+
+      const correctSelect = document.createElement('select');
+      for (let i = 0; i < 4; i++) {
+        const option = document.createElement('option');
+        option.value = i;
+        option.textContent = `Option ${i + 1}`;
+        correctSelect.appendChild(option);
+      }
+      correctSelect.value = question.correctOption;
+      correctSelect.addEventListener('change', (e) => {
+        question.correctOption = parseInt(e.target.value);
+      });
+      div.appendChild(correctSelect);
+    }
+
+    if (question instanceof CodingQuestion) {
+      // Coding question might have language selection, etc.
+      const languageSelect = document.createElement('select');
+      ['javascript', 'python', 'java'].forEach((lang) => {
+        const option = document.createElement('option');
+        option.value = lang;
+        option.textContent = lang.charAt(0).toUpperCase() + lang.slice(1);
+        languageSelect.appendChild(option);
+      });
+      languageSelect.value = question.language;
+      languageSelect.addEventListener('change', (e) => {
+        question.language = e.target.value;
+      });
+      div.appendChild(languageSelect);
+    }
+
+    return div;
+  }
+}
+
+=== End of .//renderer/components/ExamCreator.js ===
+
+      📄 ExamTaker.js
+
+=== File: .//renderer/components/ExamTaker.js ===
+Content:
+// renderer/components/ExamTaker.js
+import { Exam } from '../../models/Exam.js';
+import { MultipleChoiceQuestion } from '../../models/MultipleChoiceQuestion.js';
+import { WrittenQuestion } from '../../models/WrittenQuestion.js';
+import { CodingQuestion } from '../../models/CodingQuestion.js';
+import MonacoEditorComponent from './MonacoEditor.js';
+
+export default class ExamTaker {
+  constructor() {
+    this.exam = new Exam();
+    this.answers = {};
+  }
+
+  async fetchExams() {
+    try {
+      const exams = await window.api.getExams();
+      console.log('Fetched Exams:', exams);
+      return exams;
+    } catch (err) {
+      console.error(err);
+      alert('Failed to fetch exams. Make sure the backend server is running.');
+      return [];
+    }
+  }
+
+  async fetchExamById(examId) {
+    try {
+      const examData = await window.api.getExamById(examId);
+      console.log('Fetched Exam Data:', examData);
+      this.exam = new Exam(examData);
+      console.log('Deserialized Exam:', this.exam);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to fetch exam. Make sure the backend server is running.');
+    }
+  }
+
+  async render() {
+    const container = document.createElement('div');
+    
+    const examSelect = document.createElement('select');
+    const defaultOption = document.createElement('option');
+    defaultOption.value = '';
+    defaultOption.textContent = 'Select an Exam';
+    examSelect.appendChild(defaultOption);
+    
+    // Fetch list of exams
+    const exams = await this.fetchExams();
+    if (exams.length === 0) {
+      const noExamsMsg = document.createElement('p');
+      noExamsMsg.textContent = 'No exams available. Please create an exam first.';
+      container.appendChild(noExamsMsg);
+      return container;
+    }
+
+    exams.forEach((exam) => {
+      const option = document.createElement('option');
+      option.value = exam._id;
+      option.textContent = exam.title || 'Untitled Exam';
+      examSelect.appendChild(option);
+    });
+    
+    container.appendChild(examSelect);
+    
+    const loadExamBtn = document.createElement('button');
+    loadExamBtn.textContent = 'Load Exam';
+    container.appendChild(loadExamBtn);
+    
+    loadExamBtn.addEventListener('click', async () => {
+      const selectedId = examSelect.value;
+      if (selectedId === '') {
+        alert('Please select an exam.');
+        return;
+      }
+      await this.fetchExamById(selectedId);
+      this.renderExam(container);
+    });
+    
+    return container; // Returns a DOM Node
+  }
+
+  renderExam(container) {
+    // Clear existing content except the examSelect and loadExamBtn
+    container.innerHTML = '';
+
+    const title = document.createElement('h2');
+    title.textContent = this.exam.title || 'Untitled Exam';
+    container.appendChild(title);
+
+    console.log('Rendering Exam with Questions:', this.exam.questions);
+
+    this.exam.questions.forEach((question, index) => {
+      const questionDiv = document.createElement('div');
+      questionDiv.className = 'question';
+
+      const prompt = document.createElement('p');
+      prompt.textContent = `${index + 1}. ${question.prompt}`;
+      questionDiv.appendChild(prompt);
+
+      if (question.type === 'MultipleChoice') {
+        question.options.forEach((option, i) => {
+          const label = document.createElement('label');
+          const radio = document.createElement('input');
+          radio.type = 'radio';
+          radio.name = `question-${index}`;
+          radio.value = i;
+          radio.addEventListener('change', (e) => {
+            this.answers[index] = parseInt(e.target.value);
+          });
+          label.appendChild(radio);
+          label.appendChild(document.createTextNode(option));
+          questionDiv.appendChild(label);
+          questionDiv.appendChild(document.createElement('br'));
+        });
+      }
+
+      if (question.type === 'Written') {
+        const textarea = document.createElement('textarea');
+        textarea.rows = 4;
+        textarea.cols = 50;
+        textarea.addEventListener('input', (e) => {
+          this.answers[index] = e.target.value;
+        });
+        questionDiv.appendChild(textarea);
+      }
+
+      if (question.type === 'Coding') {
+        // Ensure Monaco is loaded
+        if (!window.monaco) {
+          const error = document.createElement('p');
+          error.textContent = 'Monaco Editor is not loaded. Please try again later.';
+          error.style.color = 'red';
+          questionDiv.appendChild(error);
+          return;
+        }
+
+        const editorContainer = document.createElement('div');
+        editorContainer.style.height = '200px';
+        questionDiv.appendChild(editorContainer);
+
+        let monacoInstance;
+        try {
+          monacoInstance = new MonacoEditorComponent(editorContainer, {
+            language: question.language,
+            value: question.code || '// Write your code here',
+          });
+        } catch (err) {
+          console.error('Failed to initialize Monaco Editor:', err);
+          const error = document.createElement('p');
+          error.textContent = 'Failed to load code editor.';
+          error.style.color = 'red';
+          questionDiv.appendChild(error);
+        }
+
+        const runBtn = document.createElement('button');
+        runBtn.textContent = 'Run Code';
+        questionDiv.appendChild(runBtn);
+
+        const output = document.createElement('pre');
+        questionDiv.appendChild(output);
+
+        // Updated runBtn event listener
+        runBtn.addEventListener('click', async () => {
+          if (!monacoInstance) {
+            output.textContent = 'Code editor is not initialized.';
+            return;
+          }
+
+          const userCode = monacoInstance.getValue();
+          this.answers[index] = userCode;
+
+          console.log(`Executing Code for Question ${index + 1}:`, userCode);
+          console.log(`Selected Language: ${question.language}`);
+
+          // Secure code execution using backend
+          try {
+            let response;
+            if (question.language === 'javascript') {
+              response = await window.api.executeJavaScript(userCode);
+              console.log(`Execution Response for Question ${index + 1}:`, response);
+              
+              // Update the frontend to display logs and result
+              output.textContent = '';
+
+              if (response.logs && response.logs.length > 0) {
+                output.textContent += response.logs.join('\n') + '\n';
+              }
+              if (response.result) {
+                output.textContent += response.result;
+              }
+            } else if (question.language === 'python') {
+              response = await window.api.executePython(userCode);
+              console.log(`Python Execution Response for Question ${index + 1}:`, response);
+              
+              // Update the frontend to display the result
+              output.textContent = response.result || '';
+            } else if (question.language === 'java') {
+              response = await window.api.executeJava(userCode);
+              console.log(`Java Execution Response for Question ${index + 1}:`, response);
+              
+              // Update the frontend to display the result
+              output.textContent = response.result || '';
+            } else {
+              output.textContent = 'Code execution not supported for this language.';
+            }
+          } catch (err) {
+            console.error(`Error Executing Code for Question ${index + 1}:`, err);
+            output.textContent = err.message;
+          }
+        });
+      }
+
+      container.appendChild(questionDiv);
+    });
+
+    const submitBtn = document.createElement('button');
+    submitBtn.textContent = 'Submit Exam';
+    container.appendChild(submitBtn);
+
+    submitBtn.addEventListener('click', () => {
+      this.gradeExam();
+    });
+  }
+
+  gradeExam() {
+    let score = 0;
+    let total = 0;
+    this.exam.questions.forEach((question, index) => {
+      const answer = this.answers[index];
+      if (question.type === 'MultipleChoice') {
+        total += 1;
+        if (answer === question.correctOption) {
+          score += 1;
+        }
+      }
+      // Implement grading for other question types as needed
+    });
+    alert(`Your score: ${score} / ${total}`);
+  }
+}
+
+=== End of .//renderer/components/ExamTaker.js ===
+
+      📄 MonacoEditor.js
+
+=== File: .//renderer/components/MonacoEditor.js ===
+Content:
+// renderer/components/MonacoEditor.js
+
+export default class MonacoEditorComponent {
+  constructor(container, options = {}) {
+    if (!window.monaco) {
+      console.error('Monaco is not loaded');
+      return;
+    }
+    this.editor = window.monaco.editor.create(container, {
+      value: options.value || '',
+      language: options.language || 'javascript',
+      theme: 'vs-dark',
+      automaticLayout: true,
+    });
+  }
+
+  getValue() {
+    return this.editor.getValue();
+  }
+
+  setValue(value) {
+    this.editor.setValue(value);
+  }
+
+  dispose() {
+    this.editor.dispose();
+  }
+}
+
+=== End of .//renderer/components/MonacoEditor.js ===
+
+    📄 index.html
+
+=== File: .//renderer/index.html ===
+Content:
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Electron Exam App</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- Content Security Policy -->
+  <meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' 'unsafe-inline' https://unpkg.com;
+  style-src 'self' 'unsafe-inline' https://unpkg.com;
+  connect-src 'self' http://localhost:3000;
+  worker-src 'self' blob:;
+">
+
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Electron Exam Application</h1>
+      <nav>
+        <button id="create-exam-btn">Create Exam</button>
+        <button id="take-exam-btn">Take Exam</button>
+      </nav>
+    </header>
+    <main id="main-content">
+      <!-- Dynamic content will be loaded here -->
+    </main>
+  </div>
+
+  <!-- Include Monaco Editor via CDN -->
+  <script src="https://unpkg.com/monaco-editor@0.33.0/min/vs/loader.js"></script>
+  <script>
+    require.config({ paths: { 'vs': 'https://unpkg.com/monaco-editor@0.33.0/min/vs' }});
+    window.MonacoEnvironment = { getWorkerUrl: () => proxy };
+    let proxy = URL.createObjectURL(new Blob([`
+      self.MonacoEnvironment = { baseUrl: 'https://unpkg.com/monaco-editor@0.33.0/min/' };
+      importScripts('https://unpkg.com/monaco-editor@0.33.0/min/vs/base/worker/workerMain.js');
+    `], { type: 'text/javascript' }));
+
+    // Load Monaco Editor and assign it to window.monaco
+    require(['vs/editor/editor.main'], function() {
+      window.monaco = monaco; // Make Monaco globally accessible
+      console.log('Monaco Editor loaded successfully.');
+    });
+  </script>
+
+  <!-- Include Renderer Script with type="module" -->
+  <script type="module" src="renderer.js"></script>
+</body>
+</html>
+
+=== End of .//renderer/index.html ===
+
+    📄 renderer.js
+
+=== File: .//renderer/renderer.js ===
+Content:
+// renderer/renderer.js
+const createExamBtn = document.getElementById('create-exam-btn');
+const takeExamBtn = document.getElementById('take-exam-btn');
+const mainContent = document.getElementById('main-content');
+
+let ExamCreator, ExamTaker; // Will be loaded dynamically
+
+createExamBtn.addEventListener('click', async () => {
+  if (!ExamCreator) {
+    try {
+      const module = await import('./components/ExamCreator.js');
+      ExamCreator = module.default;
+    } catch (err) {
+      console.error('Failed to load ExamCreator.js:', err);
+      alert('Failed to load ExamCreator component.');
+      return;
+    }
+  }
+  mainContent.innerHTML = '';
+  const creator = new ExamCreator();
+  mainContent.appendChild(creator.render());
+});
+
+takeExamBtn.addEventListener('click', async () => {
+  if (!ExamTaker) {
+    try {
+      const module = await import('./components/ExamTaker.js');
+      ExamTaker = module.default;
+    } catch (err) {
+      console.error('Failed to load ExamTaker.js:', err);
+      alert('Failed to load ExamTaker component.');
+      return;
+    }
+  }
+  
+  mainContent.innerHTML = '';
+  const taker = new ExamTaker();
+  
+  try {
+    const rendered = await taker.render(); // Await the Promise
+    mainContent.appendChild(rendered); // Append the resolved Node
+  } catch (err) {
+    console.error('Failed to render ExamTaker:', err);
+    alert('Failed to render ExamTaker component.');
+  }
+});
+
+=== End of .//renderer/renderer.js ===
+
+    📄 styles.css
+
+=== File: .//renderer/styles.css ===
+Content:
+/* renderer/styles.css */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+  }
+  
+  header {
+    background-color: #282c34;
+    padding: 20px;
+    color: white;
+  }
+  
+  nav button {
+    margin-right: 10px;
+    padding: 10px 20px;
+    font-size: 16px;
+  }
+  
+  #main-content {
+    padding: 20px;
+  }
+  
+=== End of .//renderer/styles.css ===
+
+  📁 temp
+    📄 UserCode$1HelloWorld.class
+
+=== File: .//temp/UserCode$1HelloWorld.class ===
+Content:
+����   = $
+      java/lang/Object <init> ()V	  	 
+   java/lang/System out Ljava/io/PrintStream;  Hello, cruel!
+      java/io/PrintStream println (Ljava/lang/String;)V  UserCode$1HelloWorld Code LineNumberTable main ([Ljava/lang/String;)V 
+SourceFile UserCode.java EnclosingMethod  UserCode   NestHost InnerClasses 
+HelloWorld                       *� �            	       %     	� � �       
+                    !     "   
+     #  
+=== End of .//temp/UserCode$1HelloWorld.class ===
+
