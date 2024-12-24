@@ -1,129 +1,384 @@
 // main/preload.js
 const { contextBridge } = require('electron');
 
+// Helper function to get auth header
+const getAuthHeader = () => {
+  const token = localStorage.getItem('token');
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+};
+
 contextBridge.exposeInMainWorld('api', {
-  createExam: async (examData) => {
+  // Auth endpoints
+  signup: async (userData) => {
     try {
-      const response = await fetch('http://localhost:3000/api/exams', {
+      const response = await fetch('http://localhost:3000/api/auth/signup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(examData),
+        body: JSON.stringify(userData),
       });
-      const data = await response.json();
-      return data;
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Signup failed');
+      }
+      return response.json();
     } catch (error) {
-      console.error('Error creating exam:', error);
+      console.error('Error during signup:', error);
       throw error;
     }
   },
-  getExams: async () => {
+
+  login: async (credentials) => {
     try {
-      const response = await fetch('http://localhost:3000/api/exams');
-      const exams = await response.json();
-      return exams;
+      const response = await fetch('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Login failed');
+      }
+      return response.json();
     } catch (error) {
-      console.error('Error fetching exams:', error);
+      console.error('Error during login:', error);
       throw error;
     }
   },
+
+  getProfile: async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/auth/profile', {
+        headers: {
+          ...getAuthHeader(),
+        },
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch profile');
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      throw error;
+    }
+  },
+
+  
+
   getExamById: async (id) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/exams/${id}`);
-      const exam = await response.json();
-      return exam;
+      const response = await fetch(`http://localhost:3000/api/exams/${id}`, {
+        headers: {
+          ...getAuthHeader(),
+        },
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch exam');
+      }
+      return response.json();
     } catch (error) {
       console.error('Error fetching exam:', error);
       throw error;
     }
   },
+
+  submitExam: async (examId, answers) => {
+    try {
+      const response = await fetch(`http://localhost:3000/api/exams/${examId}/submit`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        },
+        body: JSON.stringify({ answers }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to submit exam');
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Error submitting exam:', error);
+      throw error;
+    }
+  },
+
+  getSubmissions: async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/submissions', {
+        headers: {
+          ...getAuthHeader(),
+        },
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch submissions');
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Error fetching submissions:', error);
+      throw error;
+    }
+  },
+
+  gradeSubmission: async (submissionId, grades) => {
+    try {
+      const response = await fetch(`http://localhost:3000/api/submissions/${submissionId}/grade`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        },
+        body: JSON.stringify({ grades }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to grade submission');
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Error grading submission:', error);
+      throw error;
+    }
+  },
+
+  // Code execution endpoints with authentication
   executeJavaScript: async (code) => {
     try {
       const response = await fetch('http://localhost:3000/api/execute/javascript', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeader(),
         },
         body: JSON.stringify({ code }),
       });
-      const data = await response.json();
-      if (response.ok) {
-        return data; // Contains { logs: [...], result: '...' }
-      } else {
-        throw new Error(data.error);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to execute JavaScript');
       }
+      return response.json();
     } catch (error) {
-      console.error('Error executing JavaScript code:', error);
+      console.error('Error executing JavaScript:', error);
       throw error;
     }
   },
+
   executePython: async (code) => {
     try {
       const response = await fetch('http://localhost:3000/api/execute/python', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeader(),
         },
         body: JSON.stringify({ code }),
       });
-      const data = await response.json();
-      if (response.ok) {
-        return data; // Contains { result: '...' }
-      } else {
-        throw new Error(data.error);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to execute Python');
       }
+      return response.json();
     } catch (error) {
-      console.error('Error executing Python code:', error);
+      console.error('Error executing Python:', error);
       throw error;
     }
   },
-  executeJava: async (code) => { // Updated to accept only 'code'
+
+  executeJava: async (code) => {
     try {
       const response = await fetch('http://localhost:3000/api/execute/java', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...getAuthHeader(),
         },
-        body: JSON.stringify({ code }), // Send only 'code'
+        body: JSON.stringify({ code }),
       });
-      const data = await response.json();
-      if (response.ok) {
-        return data; // Contains { result: '...' }
-      } else {
-        throw new Error(data.error);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to execute Java');
       }
+      return response.json();
     } catch (error) {
-      console.error('Error executing Java code:', error);
+      console.error('Error executing Java:', error);
       throw error;
     }
   },
-  // **Add the uploadMedia function remains unchanged**
+
   uploadMedia: async (file) => {
     try {
-      // Create a FormData object and append the file
       const formData = new FormData();
       formData.append('media', file);
 
-      // Send the POST request to the Express server
       const response = await fetch('http://localhost:3000/api/uploadMedia', {
         method: 'POST',
+        headers: {
+          ...getAuthHeader(),
+        },
         body: formData,
       });
-
-      // Check if the response is OK (status in the range 200-299)
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to upload media.');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to upload media');
       }
-
-      // Parse and return the response data
-      const data = await response.json();
-      return data; // Expected to contain { url: 'https://...' }
+      return response.json();
     } catch (error) {
       console.error('Error uploading media:', error);
       throw error;
     }
   },
-  // Add more APIs as needed
+
+  getTeacherStats: async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/teacher/stats', {
+        headers: {
+          ...getAuthHeader(),
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch teacher stats');
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Error fetching teacher stats:', error);
+      throw error;
+    }
+  },
+  
+  getStudentStats: async () => {
+    try {
+      const response = await fetch('http://localhost:3000/api/student/stats', {
+        headers: {
+          ...getAuthHeader(),
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch student stats');
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Error fetching student stats:', error);
+      throw error;
+    }
+  },
+  
+  updateExamStatus: async (examId, status) => {
+    try {
+      const response = await fetch(`http://localhost:3000/api/exams/${examId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        },
+        body: JSON.stringify({ status }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to update exam status');
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Error updating exam status:', error);
+      throw error;
+    }
+  },
+  
+  getExamStats: async (examId) => {
+    try {
+      const response = await fetch(`http://localhost:3000/api/exams/${examId}/stats`, {
+        headers: {
+          ...getAuthHeader(),
+        },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch exam stats');
+      }
+      return response.json();
+    } catch (error) {
+      console.error('Error fetching exam stats:', error);
+      throw error;
+    }
+  },
+  // Add to your preload.js contextBridge.exposeInMainWorld
+// Add to your preload.js contextBridge.exposeInMainWorld
+publishExam: async (examId) => {
+  try {
+    const response = await fetch(`http://localhost:3000/api/exams/${examId}/publish`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader(),
+      }
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Failed to publish exam');
+    }
+    
+    return response.json();
+  } catch (error) {
+    console.error('Error publishing exam:', error);
+    throw error;
+  }
+},
+
+// Add to your preload.js
+
+getExams: async () => {
+  try {
+    console.log('Fetching exams...');
+    const response = await fetch('http://localhost:3000/api/exams', {
+      headers: {
+        ...getAuthHeader(),
+      }
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Error response:', error);
+      throw new Error(error.message || 'Failed to fetch exams');
+    }
+    
+    const exams = await response.json();
+    console.log('Successfully fetched exams:', exams);
+    return exams;
+  } catch (error) {
+    console.error('Error in getExams:', error);
+    throw error;
+  }
+},
+
+createExam: async (examData) => {
+  try {
+    console.log('Creating exam with data:', examData);
+    const response = await fetch('http://localhost:3000/api/exams', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader(),
+      },
+      body: JSON.stringify(examData),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('Error response:', error);
+      throw new Error(error.message || 'Failed to create exam');
+    }
+    
+    const result = await response.json();
+    console.log('Successfully created exam:', result);
+    return result;
+  } catch (error) {
+    console.error('Error in createExam:', error);
+    throw error;
+  }
+}
 });
+

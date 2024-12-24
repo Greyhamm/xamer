@@ -1,8 +1,8 @@
 // renderer/components/ExamTaker.js
-import { Exam } from '../../models/Exam.js';
-import { MultipleChoiceQuestion } from '../../models/MultipleChoiceQuestion.js';
-import { WrittenQuestion } from '../../models/WrittenQuestion.js';
-import { CodingQuestion } from '../../models/CodingQuestion.js';
+import { Exam } from '../models/Exam.js';
+import { MultipleChoiceQuestion } from '../models/MultipleChoiceQuestion.js';
+import { WrittenQuestion } from '../models/WrittenQuestion.js';
+import { CodingQuestion } from '../models/CodingQuestion.js';
 import MonacoEditorComponent from './MonacoEditor.js';
 import DOMHelper from '../helpers/DOMHelper.js'; // Ensure DOMHelper is available
 
@@ -16,11 +16,114 @@ export default class ExamTaker {
     try {
       const exams = await window.api.getExams();
       console.log('Fetched Exams:', exams);
-      return exams;
+      
+      // Filter for published exams and ensure they have questions array
+      const publishedExams = exams.filter(exam => 
+        exam.status === 'published' && exam.questions
+      ).map(exam => ({
+        ...exam,
+        questions: exam.questions || [] // Ensure questions is always an array
+      }));
+      
+      console.log('Published Exams:', publishedExams);
+      return publishedExams;
     } catch (err) {
-      console.error(err);
-      alert('Failed to fetch exams. Make sure the backend server is running.');
+      console.error('Error fetching exams:', err);
+      alert('Failed to fetch exams. Please try again.');
       return [];
+    }
+  }
+
+  async render() {
+    const container = DOMHelper.createElement('div', {
+      classes: ['exam-taker-container']
+    });
+
+    // Loading state
+    const loadingMessage = DOMHelper.createElement('p', {
+      classes: ['loading-message'],
+      text: 'Loading available exams...'
+    });
+    container.appendChild(loadingMessage);
+
+    try {
+      const exams = await this.fetchExams();
+      container.innerHTML = ''; // Clear loading message
+
+      if (!exams || exams.length === 0) {
+        const noExams = DOMHelper.createElement('p', {
+          classes: ['no-exams-message'],
+          text: 'No published exams available at the moment.'
+        });
+        container.appendChild(noExams);
+        return container;
+      }
+
+      // Exam List
+      const examList = DOMHelper.createElement('div', {
+        classes: ['exam-list']
+      });
+
+      exams.forEach(exam => {
+        const examCard = DOMHelper.createElement('div', {
+          classes: ['exam-card']
+        });
+
+        // Get number of questions safely
+        const questionCount = exam.questions ? exam.questions.length : 0;
+
+        examCard.innerHTML = `
+          <h3 class="exam-title">${exam.title || 'Untitled Exam'}</h3>
+          <p class="exam-info">${questionCount} question${questionCount === 1 ? '' : 's'}</p>
+          <button class="btn btn-primary take-exam-btn">Take Exam</button>
+        `;
+
+        const takeButton = examCard.querySelector('.take-exam-btn');
+        takeButton.addEventListener('click', () => this.startExam(exam._id));
+
+        examList.appendChild(examCard);
+      });
+
+      container.appendChild(examList);
+    } catch (error) {
+      console.error('Error rendering exams:', error);
+      container.innerHTML = `
+        <p class="error-message">Error loading exams. Please try again later.</p>
+      `;
+    }
+
+    return container;
+  }
+
+  // Add this method
+  async loadExam(examId) {
+    try {
+      const examData = await window.api.getExamById(examId);
+      console.log('Loading exam with ID:', examId);
+      console.log('Fetched Exam Data:', examData);
+      this.exam = new Exam(examData);
+      console.log('Deserialized Exam:', this.exam);
+      return true;
+    } catch (error) {
+      console.error('Error loading exam:', error);
+      alert('Failed to load exam. Please try again.');
+      return false;
+    }
+  }
+
+  // Update startExam to use loadExam
+  async startExam(examId) {
+    try {
+      const loaded = await this.loadExam(examId);
+      if (loaded) {
+        const container = document.querySelector('.exam-taker-container');
+        if (container) {
+          this.renderExam(container);
+        }
+      }
+    } catch (error) {
+      console.error('Error starting exam:', error);
+      alert('Failed to start exam. Please try again.');
     }
   }
 
@@ -36,67 +139,6 @@ export default class ExamTaker {
     }
   }
 
-  async render() {
-    const container = document.createElement('div');
-
-    // Render Exam Selection Dropdown
-    const examSelectContainer = DOMHelper.createElement('div', { classes: ['form-group'] });
-    const examSelectLabel = DOMHelper.createElement('label', {
-      attributes: { for: 'exam-select' },
-      text: 'Select an Exam',
-    });
-    examSelectContainer.appendChild(examSelectLabel);
-
-    const examSelect = DOMHelper.createElement('select', {
-      attributes: { id: 'exam-select' },
-      classes: ['select-field'],
-    });
-    const defaultOption = DOMHelper.createElement('option', {
-      attributes: { value: '' },
-      text: 'Select an Exam',
-    });
-    examSelect.appendChild(defaultOption);
-
-    // Fetch list of exams
-    const exams = await this.fetchExams();
-    if (exams.length === 0) {
-      const noExamsMsg = DOMHelper.createElement('p', {
-        text: 'No exams available. Please create an exam first.',
-      });
-      container.appendChild(noExamsMsg);
-      return container;
-    }
-
-    exams.forEach((exam) => {
-      const option = DOMHelper.createElement('option', {
-        attributes: { value: exam._id },
-        text: exam.title || 'Untitled Exam',
-      });
-      examSelect.appendChild(option);
-    });
-
-    examSelectContainer.appendChild(examSelect);
-    container.appendChild(examSelectContainer);
-
-    // Load Exam Button
-    const loadExamBtn = DOMHelper.createElement('button', {
-      classes: ['btn', 'btn-add'],
-      text: 'Load Exam',
-    });
-    container.appendChild(loadExamBtn);
-
-    loadExamBtn.addEventListener('click', async () => {
-      const selectedId = examSelect.value;
-      if (selectedId === '') {
-        alert('Please select an exam.');
-        return;
-      }
-      await this.fetchExamById(selectedId);
-      this.renderExam(container);
-    });
-
-    return container; // Returns a DOM Node
-  }
 
   renderExam(container) {
     // Clear existing content except the examSelect and loadExamBtn

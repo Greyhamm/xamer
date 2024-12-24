@@ -1,8 +1,8 @@
 // renderer/components/ExamCreator.js
-import { Exam } from '../../models/Exam.js';
-import { MultipleChoiceQuestion } from '../../models/MultipleChoiceQuestion.js';
-import { WrittenQuestion } from '../../models/WrittenQuestion.js';
-import { CodingQuestion } from '../../models/CodingQuestion.js';
+import { Exam } from '../models/Exam.js';
+import { MultipleChoiceQuestion } from '../models/MultipleChoiceQuestion.js';
+import { WrittenQuestion } from '../models/WrittenQuestion.js';
+import { CodingQuestion } from '../models/CodingQuestion.js';
 import ApiService from '../services/ApiService.js';
 import EditorService from '../services/EditorService.js';
 import DOMHelper from '../helpers/DOMHelper.js';
@@ -15,7 +15,7 @@ export default class ExamCreator {
     this.mediaFiles = new Map(); // To store media files temporarily
   }
 
-  render() {
+  render(token) {
     const container = DOMHelper.createElement('div', { classes: ['exam-creator-container'] });
 
     // Render Header
@@ -32,7 +32,7 @@ export default class ExamCreator {
     container.appendChild(questionsContainer);
 
     // Render Save Exam Button
-    container.appendChild(this.renderSaveExamButton(questionsContainer));
+    container.appendChild(this.renderSaveExamButton(questionsContainer, token));
 
     return container; // Ensure this is an HTMLElement
   }
@@ -482,29 +482,40 @@ export default class ExamCreator {
     }
   }
 
-  renderSaveExamButton(questionsContainer) { // Removed 'async' keyword
-    const saveExamBtn = DOMHelper.createElement('button', {
-      classes: ['btn', 'btn-save'],
-      text: 'Save Exam',
+  // Update the renderSaveExamButton method in ExamCreator.js
+
+  renderSaveExamButton(questionsContainer) {
+    const buttonContainer = DOMHelper.createElement('div', {
+      classes: ['save-button-container']
     });
 
-    // Event Listener for Save Exam
-    saveExamBtn.addEventListener('click', async () => { // Handle async within the event
+    const saveExamBtn = DOMHelper.createElement('button', {
+      classes: ['btn', 'btn-save'],
+      text: 'Save & Publish Exam'
+    });
+
+    const saveDraftBtn = DOMHelper.createElement('button', {
+      classes: ['btn', 'btn-draft'],
+      text: 'Save as Draft'
+    });
+
+    // Event Listener for Save & Publish
+    saveExamBtn.addEventListener('click', async () => {
       try {
-        // Validate Exam
         const validationError = this.validateExam();
         if (validationError) {
           alert(`Validation Error: ${validationError}`);
           return;
         }
 
-        // Handle media uploads before creating the exam
         await this.handleMediaUploads();
 
+        // Set the status to published
+        this.exam.status = 'published';
+        
         const data = await ApiService.createExam(this.exam);
         if (data.message) {
-          alert('Exam Saved Successfully!');
-          // Clear the form
+          alert('Exam Saved and Published Successfully!');
           this.clearForm(questionsContainer);
         } else {
           alert(`Error: ${data.error || 'Unknown error'}`);
@@ -515,7 +526,36 @@ export default class ExamCreator {
       }
     });
 
-    return saveExamBtn;
+    // Event Listener for Save as Draft
+    saveDraftBtn.addEventListener('click', async () => {
+      try {
+        const validationError = this.validateExam();
+        if (validationError) {
+          alert(`Validation Error: ${validationError}`);
+          return;
+        }
+
+        await this.handleMediaUploads();
+
+        // Set the status to draft
+        this.exam.status = 'draft';
+        
+        const data = await ApiService.createExam(this.exam);
+        if (data.message) {
+          alert('Exam Saved as Draft Successfully!');
+          this.clearForm(questionsContainer);
+        } else {
+          alert(`Error: ${data.error || 'Unknown error'}`);
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Failed to save exam. Make sure the backend server is running.');
+      }
+    });
+
+    buttonContainer.appendChild(saveDraftBtn);
+    buttonContainer.appendChild(saveExamBtn);
+    return buttonContainer;
   }
 
   async handleMediaUploads() {

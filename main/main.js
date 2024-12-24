@@ -8,6 +8,7 @@ const mongoose = require('mongoose');
 const examRoutes = require('../backend/routes/examRoutes');
 const codeExecutionRoutes = require('../backend/routes/codeExecutionRoutes');
 const mediaRoutes = require('../backend/routes/media');
+const authRoutes = require('../backend/routes/auth'); // Add this line
 
 // Initialize Express App
 const expressApp = express();
@@ -18,12 +19,13 @@ expressApp.use(cors());
 expressApp.use(bodyParser.json());
 
 // Connect to MongoDB
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/electron_exam_app'; // Replace with your MongoDB URI
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/electron_exam_app';
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// Use Exam Routes
+// Use Routes
+expressApp.use('/api/auth', authRoutes); // Add this line
 expressApp.use('/api', examRoutes);
 expressApp.use('/api', codeExecutionRoutes);
 expressApp.use('/api', mediaRoutes);
