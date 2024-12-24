@@ -87,26 +87,34 @@ contextBridge.exposeInMainWorld('api', {
     }
   },
 
-  submitExam: async (examId, answers) => {
-    try {
-      const response = await fetch(`http://localhost:3000/api/exams/${examId}/submit`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...getAuthHeader(),
-        },
-        body: JSON.stringify({ answers }),
-      });
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to submit exam');
-      }
-      return response.json();
-    } catch (error) {
-      console.error('Error submitting exam:', error);
-      throw error;
+// In preload.js
+submitExam: async (examId, answers) => {
+  try {
+    console.log('Submitting exam with ID:', examId);
+    console.log('Answers:', answers);
+
+    const response = await fetch(`http://localhost:3000/api/exams/${examId}/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...getAuthHeader(),
+      },
+      body: JSON.stringify({ answers }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Failed to submit exam');
     }
-  },
+
+    const data = await response.json();
+    console.log('Submission response:', data);
+    return data;
+  } catch (error) {
+    console.error('Error in submitExam:', error);
+    throw error;
+  }
+},
 
   getSubmissions: async () => {
     try {

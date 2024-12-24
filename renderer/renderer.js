@@ -6,6 +6,7 @@ import SignupForm from './components/Auth/SignupForm.js';
 import TeacherDashboard from './components/Dashboard/TeacherDashboard.js';
 import StudentDashboard from './components/Dashboard/StudentDashboard.js';
 import AuthManager from './components/Auth/AuthManager.js';
+import SubmissionsView from './components/Submissions/SubmissionsView.js';
 class App {
   constructor() {
     this.currentUser = null;
@@ -194,7 +195,34 @@ class App {
       alert('Failed to load results.');
     }
   }
+  async loadSubmissions() {
+    try {
+      const mainContent = document.getElementById('main-content');
+      mainContent.innerHTML = '<div class="loading">Loading submissions...</div>';
+      
+      const submissionsView = new SubmissionsView();
+      mainContent.innerHTML = '';
+      mainContent.appendChild(submissionsView.render());
+    } catch (error) {
+      console.error('Failed to load submissions:', error);
+      alert('Failed to load submissions.');
+    }
+  }
+  
+  // Update the student dashboard exam taking handler
+  async loadExamTaker() {
+    try {
+      const examTaker = new ExamTaker();
+      const content = await examTaker.render();
+      document.getElementById('main-content').innerHTML = '';
+      document.getElementById('main-content').appendChild(content);
+    } catch (error) {
+      console.error('Failed to load ExamTaker:', error);
+      alert('Failed to load exam taker.');
+    }
+  }
 }
+
 
 // Initialize the application when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {

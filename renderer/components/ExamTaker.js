@@ -95,21 +95,7 @@ export default class ExamTaker {
     return container;
   }
 
-  // Add this method
-  async loadExam(examId) {
-    try {
-      const examData = await window.api.getExamById(examId);
-      console.log('Loading exam with ID:', examId);
-      console.log('Fetched Exam Data:', examData);
-      this.exam = new Exam(examData);
-      console.log('Deserialized Exam:', this.exam);
-      return true;
-    } catch (error) {
-      console.error('Error loading exam:', error);
-      alert('Failed to load exam. Please try again.');
-      return false;
-    }
-  }
+
 
   // Update startExam to use loadExam
   async startExam(examId) {
@@ -140,15 +126,18 @@ export default class ExamTaker {
   }
 
 
+  // renderer/components/ExamTaker.js
   renderExam(container) {
-    // Clear existing content except the examSelect and loadExamBtn
-    container.innerHTML = '';
+    // Create a new container instead of modifying the passed one
+    const examContainer = DOMHelper.createElement('div', {
+      classes: ['exam-container']
+    });
 
     const title = DOMHelper.createElement('h2', {
       text: this.exam.title || 'Untitled Exam',
-      classes: ['exam-title'],
+      classes: ['exam-title']
     });
-    container.appendChild(title);
+    examContainer.appendChild(title);
 
     console.log('Rendering Exam with Questions:', this.exam.questions);
 
@@ -158,14 +147,14 @@ export default class ExamTaker {
       // Question Header
       const header = DOMHelper.createElement('h3', {
         classes: ['question-header'],
-        text: `Question ${index + 1}`,
+        text: `Question ${index + 1}`
       });
       questionDiv.appendChild(header);
 
       // Question Prompt
       const prompt = DOMHelper.createElement('p', {
         classes: ['question-prompt'],
-        text: question.prompt,
+        text: question.prompt
       });
       questionDiv.appendChild(prompt);
 
@@ -176,13 +165,13 @@ export default class ExamTaker {
         if (question.media.type === 'image') {
           const img = DOMHelper.createElement('img', {
             attributes: { src: question.media.url, alt: 'Question Image' },
-            classes: ['media-image'],
+            classes: ['media-image']
           });
           mediaContainer.appendChild(img);
         } else if (question.media.type === 'video') {
           const video = DOMHelper.createElement('video', {
             attributes: { src: question.media.url, controls: true },
-            classes: ['media-video'],
+            classes: ['media-video']
           });
           mediaContainer.appendChild(video);
         }
@@ -193,29 +182,27 @@ export default class ExamTaker {
       // Render Answer Fields based on question type
       if (question.type === 'MultipleChoice') {
         this.renderMultipleChoiceQuestion(question, index, questionDiv);
-      }
-
-      if (question.type === 'Written') {
+      } else if (question.type === 'Written') {
         this.renderWrittenQuestion(question, index, questionDiv);
-      }
-
-      if (question.type === 'Coding') {
+      } else if (question.type === 'Coding') {
         this.renderCodingQuestion(question, index, questionDiv);
       }
 
-      container.appendChild(questionDiv);
+      examContainer.appendChild(questionDiv);
     });
 
     // Submit Exam Button
     const submitBtn = DOMHelper.createElement('button', {
       classes: ['btn', 'btn-save'],
-      text: 'Submit Exam',
+      text: 'Submit Exam'
     });
-    container.appendChild(submitBtn);
 
     submitBtn.addEventListener('click', () => {
       this.gradeExam();
     });
+
+    examContainer.appendChild(submitBtn);
+    return examContainer;
   }
 
   renderMultipleChoiceQuestion(question, index, parentDiv) {
@@ -351,20 +338,96 @@ export default class ExamTaker {
     });
   }
 
-  gradeExam() {
-    let score = 0;
-    let total = 0;
-    this.exam.questions.forEach((question, index) => {
-      const answer = this.answers[index];
-      if (question.type === 'MultipleChoice') {
-        total += 1;
-        if (answer === question.correctOption) {
-          score += 1;
-        }
+  async gradeExam() {
+    try {
+      // Check if we have a valid exam
+      if (!this.exam || !this.exam._id) {
+        console.error('Invalid exam data:', this.exam);
+        alert('Error: Invalid exam data');
+        return;
       }
-      // Implement grading for other question types as needed
-      // For example, written answers could be manually graded or have some automated checks
-    });
-    alert(`Your score: ${score} / ${total}`);
+  
+      // Validate that we have answers
+      if (Object.keys(this.answers).length === 0) {
+        alert('Please answer at least one question before submitting.');
+        return;
+      }
+  
+      // Collect all answers
+      const formattedAnswers = this.exam.questions.map((question, index) => {
+        console.log('Processing question:', question);
+        return {
+          questionId: question._id, // Use _id instead of id
+          questionType: question.type,
+          answer: this.answers[index],
+          selectedOption: question.type === 'MultipleChoice' ? this.answers[index] : undefined
+        };
+      });
+  
+      console.log('Submitting exam:', {
+        examId: this.exam._id,
+        answers: formattedAnswers
+      });
+  
+      // Submit the exam
+      await window.api.submitExam(this.exam._id, formattedAnswers);
+  
+      // Calculate immediate score for MCQs
+      let mcqScore = 0;
+      let totalMcq = 0;
+  
+      this.exam.questions.forEach((question, index) => {
+        if (question.type === 'MultipleChoice') {
+          totalMcq += 1;
+          if (this.answers[index] === question.correctOption) {
+            mcqScore += 1;
+          }
+        }
+      });
+  
+      // Show score for MCQs and confirmation message
+      const mcqMessage = totalMcq > 0 ? 
+        `\nMultiple Choice Score: ${mcqScore}/${totalMcq}` : 
+        '';
+  
+      alert(`Exam submitted successfully!${mcqMessage}\n\nOther question types will be graded by your teacher.`);
+  
+      // Redirect to dashboard
+      window.location.reload(); // Reload to show updated dashboard
+  
+    } catch (error) {
+      console.error('Error submitting exam:', error);
+      alert(`Failed to submit exam: ${error.message}`);
+    }
+  }
+  
+  // Update loadExam method
+  async loadExam(examId) {
+    try {
+      const examData = await window.api.getExamById(examId);
+      console.log('Loading exam with ID:', examId);
+      console.log('Fetched Exam Data:', examData);
+  
+      // Ensure the exam data has the required properties
+      if (!examData || !examData._id) {
+        throw new Error('Invalid exam data received from server');
+      }
+  
+      // Create new Exam instance with the data
+      this.exam = {
+        ...examData,
+        questions: examData.questions.map(q => ({
+          ...q,
+          _id: q._id || q.id // Ensure we have _id
+        }))
+      };
+  
+      console.log('Processed Exam Data:', this.exam);
+      return true;
+    } catch (error) {
+      console.error('Error loading exam:', error);
+      alert('Failed to load exam. Please try again.');
+      return false;
+    }
   }
 }

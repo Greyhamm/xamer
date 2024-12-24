@@ -500,3 +500,60 @@ nav button:hover {
   background: #f8d7da;
   border-radius: 4px;
 }
+/* Add to your styles.css */
+.submissions-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.submissions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.submissions-title {
+  font-size: 24px;
+  color: #333;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge.submitted {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.status-badge.graded {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.loading-message {
+  text-align: center;
+  color: #666;
+  margin: 20px 0;
+}
+
+.no-data-message {
+  text-align: center;
+  color: #666;
+  margin: 40px 0;
+  font-size: 16px;
+}
+
+.error-message {
+  color: #dc3545;
+  text-align: center;
+  margin: 20px 0;
+  padding: 10px;
+  background: #f8d7da;
+  border-radius: 4px;
+}

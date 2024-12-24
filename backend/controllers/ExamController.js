@@ -98,41 +98,87 @@ getExamById: async (req, res) => {
   }
 },
 
-  submitExam: async (req, res) => {
-    try {
-      const { examId } = req.params;
-      const { answers } = req.body;
+// In ExamController.js
+submitExam: async (req, res) => {
+  try {
+    const { examId } = req.params;
+    const { answers } = req.body;
+    const studentId = req.user.userId;
 
-      const exam = await Exam.findOne({ _id: examId, status: 'published' });
-      if (!exam) {
-        return res.status(404).json({ message: 'Exam not found or not published' });
-      }
+    console.log('Received submission:', {
+      examId,
+      studentId,
+      answers
+    });
 
-      const existingSubmission = await ExamSubmission.findOne({
-        exam: examId,
-        student: req.user.userId
+    // Validate exam ID
+    if (!examId) {
+      return res.status(400).json({
+        message: 'Exam ID is required'
       });
-
-      if (existingSubmission) {
-        return res.status(400).json({ message: 'You have already submitted this exam' });
-      }
-
-      const submission = new ExamSubmission({
-        exam: examId,
-        student: req.user.userId,
-        answers: answers.map(answer => ({
-          questionId: answer.questionId,
-          answer: answer.answer
-        }))
-      });
-
-      await submission.save();
-      res.status(201).json({ message: 'Exam submitted successfully' });
-    } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: 'Server Error' });
     }
-  },
+
+    // Check if exam exists and is published
+    const exam = await Exam.findOne({
+      _id: examId,
+      status: 'published'
+    });
+
+    if (!exam) {
+      return res.status(404).json({
+        message: 'Exam not found or not published'
+      });
+    }
+
+    // Check if student has already submitted this exam
+    const existingSubmission = await ExamSubmission.findOne({
+      exam: examId,
+      student: studentId
+    });
+
+    if (existingSubmission) {
+      return res.status(400).json({
+        message: 'You have already submitted this exam'
+      });
+    }
+
+    // Validate answers
+    if (!Array.isArray(answers)) {
+      return res.status(400).json({
+        message: 'Invalid answers format'
+      });
+    }
+
+    // Create submission
+    const submission = new ExamSubmission({
+      exam: examId,
+      student: studentId,
+      answers: answers.map(answer => ({
+        questionId: answer.questionId,
+        questionType: answer.questionType,
+        answer: answer.answer,
+        selectedOption: answer.selectedOption
+      })),
+      status: 'submitted',
+      submittedAt: new Date()
+    });
+
+    await submission.save();
+    console.log('Saved submission:', submission);
+
+    res.status(201).json({
+      message: 'Exam submitted successfully',
+      submissionId: submission._id
+    });
+
+  } catch (error) {
+    console.error('Error in submitExam:', error);
+    res.status(500).json({
+      message: 'Error submitting exam',
+      error: error.message
+    });
+  }
+},
 
   getSubmissions: async (req, res) => {
     try {
