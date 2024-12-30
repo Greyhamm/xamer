@@ -54,14 +54,21 @@ export default class SignupForm {
     this.submitButton.setLoading(true);
 
     try {
-      await UserState.signup({
+      const result = await UserState.signup({
         username: this.state.username,
         email: this.state.email,
         password: this.state.password,
         role: this.state.role
       });
+
+      if (!result) {
+        throw new Error('Signup failed - please try again');
+      }
+
     } catch (error) {
-      this.setState({ error: error.message });
+      this.setState({ 
+        error: error.message || 'Server error - please try again later'
+      });
     } finally {
       this.setState({ loading: false });
       this.submitButton.setLoading(false);

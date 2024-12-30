@@ -11,7 +11,19 @@ class AuthAPI {
   
     static async signup(userData) {
       try {
-        const response = await window.api.signup(userData);
+        // Add explicit endpoint URL and headers
+        const response = await window.api.signup({
+          endpoint: '/auth/signup', // Remove /api prefix if not needed
+          data: userData,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Signup failed: ${response.statusText}`);
+        }
+        
         this.handleAuthResponse(response);
         return response;
       } catch (error) {
@@ -36,7 +48,9 @@ class AuthAPI {
   
     static handleError(error) {
       console.error('Auth API Error:', error);
-      return new Error(error.message || 'Authentication failed');
+      // Improve error message
+      const message = error.message || 'Authentication failed. Please try again.';
+      return new Error(message);
     }
   
     static logout() {

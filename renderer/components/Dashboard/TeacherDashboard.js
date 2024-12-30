@@ -1,6 +1,6 @@
 import ExamAPI from '../../services/api/examAPI.js';
 import SubmissionAPI from '../../services/api/submissionAPI.js';
-import { formatDate } from '../../services/utils/formatting.js';
+import { formatDate } from '../../services/utils/formating.js';
 import AppState from '../../services/state/AppState.js';
 
 export default class TeacherDashboard {

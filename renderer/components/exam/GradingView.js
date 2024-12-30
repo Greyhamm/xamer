@@ -1,6 +1,6 @@
-import SubmissionAPI from '../../../services/api/submissionAPI.js';
-import { formatDate } from '../../../services/utils/formatting.js';
-import { MultipleChoiceGrader, WrittenGrader, CodingGrader } from './QuestionGraders/index.js';
+import SubmissionAPI from '../../services/api/SubmissionAPI.js';  
+import { formatDate } from '../../services/utils/formating.js';
+import { MultipleChoiceGrader, WrittenGrader, CodingGrader } from './grading/QuestionGraders/index.js';
 
 export default class GradingView {
   constructor(submission, onGradingComplete) {

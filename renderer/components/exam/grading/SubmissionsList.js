@@ -1,6 +1,6 @@
 import SubmissionAPI from '../../../services/api/submissionAPI.js';
 import GradingView from './GradingView.js';
-import { formatDate } from '../../../services/utils/formatting.js';
+import { formatDate } from '../../../services/utils/formating.js';
 
 export default class SubmissionsList {
   constructor() {
