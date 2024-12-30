@@ -1,240 +1,195 @@
-// renderer/components/Dashboard/TeacherDashboard.js
-import DOMHelper from '../../helpers/DOMHelper.js';
-import ExamCreator from '../ExamCreator.js';
+import ExamAPI from '../../services/api/examAPI.js';
+import SubmissionAPI from '../../services/api/submissionAPI.js';
+import { formatDate } from '../../services/utils/formatting.js';
+import AppState from '../../services/state/AppState.js';
+
 export default class TeacherDashboard {
-  constructor(user) {
-    this.user = user;
+  constructor() {
     this.state = {
       stats: null,
+      recentExams: [],
       recentSubmissions: [],
-      loading: true
+      loading: true,
+      error: null
     };
   }
 
-  async fetchData() {
+  async loadDashboardData() {
     try {
-      const [stats, submissions] = await Promise.all([
-        window.api.getTeacherStats(),
-        window.api.getSubmissions()
+      const [stats, submissions, exams] = await Promise.all([
+        ExamAPI.getTeacherStats(),
+        SubmissionAPI.getSubmissions(),
+        ExamAPI.getExams()
       ]);
-      this.state.stats = stats;
-      this.state.recentSubmissions = submissions
-        .sort((a, b) => new Date(b.submittedAt) - new Date(a.submittedAt))
-        .slice(0, 5);
+
+      this.setState({
+        stats,
+        recentSubmissions: submissions.slice(0, 5),
+        recentExams: exams.slice(0, 5),
+        loading: false
+      });
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      this.state.loading = false;
+      this.setState({ error: error.message, loading: false });
     }
   }
 
-  render() {
-    const container = DOMHelper.createElement('div', {
-      classes: ['dashboard']
-    });
+  setState(newState) {
+    this.state = { ...this.state, ...newState };
+    this.updateUI();
+  }
 
-    // Dashboard Header
-    const header = DOMHelper.createElement('div', {
-      classes: ['dashboard-header']
-    });
+  renderStatsCards() {
+    const container = document.createElement('div');
+    container.className = 'stats-cards';
 
-    const title = DOMHelper.createElement('h2', {
-      classes: ['dashboard-title'],
-      text: `Welcome, ${this.user.username}!`
-    });
+    const stats = [
+      { label: 'Total Exams', value: this.state.stats.totalExams },
+      { label: 'Published Exams', value: this.state.stats.publishedExams },
+      { label: 'Pending Grades', value: this.state.stats.pendingGrading },
+      { label: 'Total Submissions', value: this.state.stats.totalSubmissions }
+    ];
 
-    const createExamBtn = DOMHelper.createElement('button', {
-      classes: ['btn', 'btn-add'],
-      text: 'Create New Exam'
-    });
-
-    createExamBtn.addEventListener('click', () => {
-      const examCreator = new ExamCreator();
-      const mainContent = document.getElementById('main-content');
-      mainContent.innerHTML = '';
-      mainContent.appendChild(examCreator.render());
-    });
-
-    header.appendChild(title);
-    header.appendChild(createExamBtn);
-    container.appendChild(header);
-
-    // Loading State
-    const loadingDiv = DOMHelper.createElement('div', {
-      classes: ['loading-container'],
-      text: 'Loading dashboard...'
-    });
-    container.appendChild(loadingDiv);
-
-    // Fetch and render data
-    this.fetchData().then(() => {
-      loadingDiv.remove();
-      
-      // Stats Cards
-      const statsContainer = DOMHelper.createElement('div', {
-        classes: ['dashboard-stats']
-      });
-
-      // Create stat cards
-      const statCards = [
-        {
-          title: 'Total Exams',
-          value: this.state.stats.totalExams
-        },
-        {
-          title: 'Published Exams',
-          value: this.state.stats.publishedExams
-        },
-        {
-          title: 'Total Submissions',
-          value: this.state.stats.totalSubmissions
-        },
-        {
-          title: 'Pending Grading',
-          value: this.state.stats.pendingGrading
-        }
-      ];
-
-      statCards.forEach(stat => {
-        const card = this.createStatCard(stat.title, stat.value);
-        statsContainer.appendChild(card);
-      });
-
-      container.appendChild(statsContainer);
-
-      // Recent Submissions
-      if (this.state.recentSubmissions.length > 0) {
-        container.appendChild(this.createRecentSubmissionsTable());
-      }
-
-      // Quick Actions
-      container.appendChild(this.createQuickActions());
+    stats.forEach(stat => {
+      const card = document.createElement('div');
+      card.className = 'stat-card';
+      card.innerHTML = `
+        <h3>${stat.label}</h3>
+        <p class="stat-value">${stat.value}</p>
+      `;
+      container.appendChild(card);
     });
 
     return container;
   }
 
-  createStatCard(title, value) {
-    const card = DOMHelper.createElement('div', {
-      classes: ['stat-card']
-    });
+  renderRecentExams() {
+    const container = document.createElement('div');
+    container.className = 'recent-exams section';
 
-    const titleElement = DOMHelper.createElement('div', {
-      classes: ['stat-title'],
-      text: title
-    });
-
-    const valueElement = DOMHelper.createElement('div', {
-      classes: ['stat-value'],
-      text: value
-    });
-
-    card.appendChild(titleElement);
-    card.appendChild(valueElement);
-
-    return card;
-  }
-
-  createRecentSubmissionsTable() {
-    const container = DOMHelper.createElement('div', {
-      classes: ['submissions-section']
-    });
-
-    const title = DOMHelper.createElement('h3', {
-      text: 'Recent Submissions',
-      classes: ['section-title']
-    });
-
-    const table = DOMHelper.createElement('table', {
-      classes: ['data-table']
-    });
-
-    const thead = DOMHelper.createElement('thead');
-    thead.innerHTML = `
-      <tr>
-        <th>Student</th>
-        <th>Exam</th>
-        <th>Status</th>
-        <th>Submitted</th>
-        <th>Action</th>
-      </tr>
+    const header = document.createElement('div');
+    header.className = 'section-header';
+    header.innerHTML = `
+      <h3>Recent Exams</h3>
+      <button class="btn btn-primary">Create New Exam</button>
     `;
 
-    const tbody = DOMHelper.createElement('tbody');
-    this.state.recentSubmissions.forEach(submission => {
-      const row = DOMHelper.createElement('tr');
-      
-      const statusClass = submission.status === 'graded' ? 'status-graded' : 'status-submitted';
-      const actionButton = DOMHelper.createElement('button', {
-        classes: ['btn', submission.status === 'graded' ? 'btn-secondary' : 'btn-primary'],
-        text: submission.status === 'graded' ? 'Review' : 'Grade'
-      });
-
-      actionButton.addEventListener('click', () => {
-        // Navigate to grading view
-        // Implementation needed
-      });
-
-      row.innerHTML = `
-        <td>${submission.student.username}</td>
-        <td>${submission.exam.title}</td>
-        <td><span class="status-badge ${statusClass}">${submission.status}</span></td>
-        <td>${new Date(submission.submittedAt).toLocaleDateString()}</td>
-      `;
-
-      const actionCell = DOMHelper.createElement('td');
-      actionCell.appendChild(actionButton);
-      row.appendChild(actionCell);
-      
-      tbody.appendChild(row);
+    const createExamButton = header.querySelector('button');
+    createExamButton.addEventListener('click', () => {
+      AppState.navigateTo('examCreator');
     });
 
-    table.appendChild(thead);
-    table.appendChild(tbody);
-    container.appendChild(title);
-    container.appendChild(table);
+    const examsList = document.createElement('div');
+    examsList.className = 'exams-list';
 
+    this.state.recentExams.forEach(exam => {
+      const examCard = document.createElement('div');
+      examCard.className = 'exam-card';
+      examCard.innerHTML = `
+        <h4>${exam.title}</h4>
+        <p>Status: <span class="status-badge ${exam.status}">${exam.status}</span></p>
+        <p>Questions: ${exam.questions.length}</p>
+        <p>Created: ${formatDate(exam.createdAt)}</p>
+        <div class="card-actions">
+          <button class="btn btn-secondary">View Details</button>
+          ${exam.status === 'draft' ? '<button class="btn btn-primary">Publish</button>' : ''}
+        </div>
+      `;
+
+      const viewButton = examCard.querySelector('.btn-secondary');
+      viewButton.addEventListener('click', () => {
+        AppState.navigateTo('examDetails', { examId: exam._id });
+      });
+
+      const publishButton = examCard.querySelector('.btn-primary');
+      if (publishButton) {
+        publishButton.addEventListener('click', async () => {
+          try {
+            await ExamAPI.publishExam(exam._id);
+            this.loadDashboardData();
+          } catch (error) {
+            alert('Failed to publish exam: ' + error.message);
+          }
+        });
+      }
+
+      examsList.appendChild(examCard);
+    });
+
+    container.appendChild(header);
+    container.appendChild(examsList);
     return container;
   }
 
-  createQuickActions() {
-    const container = DOMHelper.createElement('div', {
-      classes: ['quick-actions']
+  renderRecentSubmissions() {
+    const container = document.createElement('div');
+    container.className = 'recent-submissions section';
+
+    const header = document.createElement('div');
+    header.className = 'section-header';
+    header.innerHTML = `
+      <h3>Recent Submissions</h3>
+      <button class="btn btn-secondary">View All</button>
+    `;
+
+    const viewAllButton = header.querySelector('button');
+    viewAllButton.addEventListener('click', () => {
+      AppState.navigateTo('submissionsList');
     });
 
-    const title = DOMHelper.createElement('h3', {
-      text: 'Quick Actions',
-      classes: ['section-title']
+    const submissionsList = document.createElement('div');
+    submissionsList.className = 'submissions-list';
+
+    this.state.recentSubmissions.forEach(submission => {
+      const submissionCard = document.createElement('div');
+      submissionCard.className = 'submission-card';
+      submissionCard.innerHTML = `
+        <div class="submission-info">
+          <h4>${submission.exam.title}</h4>
+          <p>Student: ${submission.student.username}</p>
+          <p>Submitted: ${formatDate(submission.submittedAt)}</p>
+          <p>Status: <span class="status-badge ${submission.status}">${submission.status}</span></p>
+        </div>
+        <button class="btn btn-${submission.status === 'graded' ? 'secondary' : 'primary'}">
+          ${submission.status === 'graded' ? 'Review' : 'Grade'}
+        </button>
+      `;
+
+      const actionButton = submissionCard.querySelector('button');
+      actionButton.addEventListener('click', () => {
+        AppState.navigateTo('gradingView', { submissionId: submission._id });
+      });
+
+      submissionsList.appendChild(submissionCard);
     });
 
-    const actions = DOMHelper.createElement('div', {
-      classes: ['action-buttons']
-    });
+    container.appendChild(header);
+    container.appendChild(submissionsList);
+    return container;
+  }
 
-    const viewAllExamsBtn = DOMHelper.createElement('button', {
-      classes: ['btn', 'btn-secondary'],
-      text: 'View All Exams'
-    });
+  render() {
+    const container = document.createElement('div');
+    container.className = 'teacher-dashboard';
 
-    const viewAllSubmissionsBtn = DOMHelper.createElement('button', {
-      classes: ['btn', 'btn-secondary'],
-      text: 'View All Submissions'
-    });
+    if (this.state.loading) {
+      container.innerHTML = '<div class="loading">Loading dashboard data...</div>';
+      this.loadDashboardData();
+      return container;
+    }
 
-    viewAllExamsBtn.addEventListener('click', () => {
-      // Navigate to exams list
-      // Implementation needed
-    });
+    if (this.state.error) {
+      container.innerHTML = `<div class="error">${this.state.error}</div>`;
+      return container;
+    }
 
-    viewAllSubmissionsBtn.addEventListener('click', () => {
-      // Navigate to submissions list
-      // Implementation needed
-    });
+    const header = document.createElement('div');
+    header.className = 'dashboard-header';
+    header.innerHTML = `<h2>Teacher Dashboard</h2>`;
 
-    actions.appendChild(viewAllExamsBtn);
-    actions.appendChild(viewAllSubmissionsBtn);
-    container.appendChild(title);
-    container.appendChild(actions);
+    container.appendChild(header);
+    container.appendChild(this.renderStatsCards());
+    container.appendChild(this.renderRecentExams());
+    container.appendChild(this.renderRecentSubmissions());
 
     return container;
   }

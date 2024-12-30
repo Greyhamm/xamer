@@ -49,3 +49,10 @@ coverage/
 .DS_Store
 Thumbs.db
 temp
+
+
+#
+Archive.zip
+output.txt
+script.py
+struct.sh

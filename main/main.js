@@ -1,101 +1,100 @@
-// main/main.js
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const express = require('express');
-const bodyParser = require('body-parser');
 const cors = require('cors');
-const mongoose = require('mongoose');
-const examRoutes = require('../backend/routes/examRoutes');
-const codeExecutionRoutes = require('../backend/routes/codeExecutionRoutes');
-const mediaRoutes = require('../backend/routes/media');
-const authRoutes = require('../backend/routes/auth'); // Add this line
+const connectDB = require('../backend/config/database');
 
-// Initialize Express App
-const expressApp = express();
-const EXPRESS_PORT = process.env.PORT || 3000;
+class MainProcess {
+  constructor() {
+    this.mainWindow = null;
+    this.expressApp = express();
+    this.setupExpress();
+    this.setupDatabase();
+  }
 
-// Middleware
-expressApp.use(cors());
-expressApp.use(bodyParser.json());
+  setupExpress() {
+    // Middleware
+    this.expressApp.use(cors());
+    this.expressApp.use(express.json());
+    
+    // Serve static files - add these lines
+    this.expressApp.use(express.static(path.join(__dirname, '..')));
+    this.expressApp.use('/renderer', express.static(path.join(__dirname, '..', 'renderer')));
+    this.expressApp.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+    
+    // Routes
+    this.expressApp.use('/api/auth', require('../backend/routes/auth'));
+    this.expressApp.use('/api/exams', require('../backend/routes/exam'));
+    this.expressApp.use('/api', require('../backend/routes/submission'));
+    this.expressApp.use('/api', require('../backend/routes/codeExecution'));
+    this.expressApp.use('/api/media', require('../backend/routes/media'));
 
-// Connect to MongoDB
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/electron_exam_app';
-mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
+    const port = process.env.PORT || 3000;
+    this.server = this.expressApp.listen(port, () => {
+        console.log(`Express server running on port ${port}`);
+    });
+  }
 
-// Use Routes
-expressApp.use('/api/auth', authRoutes); // Add this line
-expressApp.use('/api', examRoutes);
-expressApp.use('/api', codeExecutionRoutes);
-expressApp.use('/api', mediaRoutes);
-expressApp.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+  async setupDatabase() {
+    try {
+      await connectDB();
+      console.log('Connected to MongoDB');
+    } catch (error) {
+      console.error('Database connection failed:', error);
+      process.exit(1);
+    }
+  }
 
-// Start Express Server and Store the Server Instance
-const server = expressApp.listen(EXPRESS_PORT, () => {
-  console.log(`Express server running on http://localhost:${EXPRESS_PORT}`);
-});
+  createWindow() {
+    this.mainWindow = new BrowserWindow({
+      width: 1200,
+      height: 800,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        preload: path.join(__dirname, 'preload.js'),
+        webSecurity: true
+      }
+    });
 
-// Function to Create the Main Window
-function createWindow() {
-  const win = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'), // Correct path to preload.js
-      nodeIntegration: false, // Disabled for security
-      contextIsolation: true, // Enabled
-    },
-  });
+    // In development, use a local file path
+    if (process.env.NODE_ENV === 'development') {
+      this.mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+      // Enable DevTools
+      this.mainWindow.webContents.openDevTools();
+    } else {
+      this.mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+    }
+  }
 
-  win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  init() {
+    app.whenReady().then(() => {
+      this.createWindow();
 
-  // Uncomment the following line to open DevTools by default
-  // win.webContents.openDevTools();
+      app.on('activate', () => {
+        if (BrowserWindow.getAllWindows().length === 0) {
+          this.createWindow();
+        }
+      });
+    });
 
-  // Handle the Window's 'close' Event
-  win.on('close', (event) => {
-    // Prevent the default close behavior to handle cleanup
-    event.preventDefault();
+    app.on('window-all-closed', () => {
+      if (process.platform !== 'darwin') {
+        app.quit();
+      }
+    });
 
-    // Quit the app, which will trigger the 'before-quit' event
-    app.quit();
-  });
+    app.on('before-quit', (event) => {
+      if (this.server) {
+        event.preventDefault();
+        this.server.close(() => {
+          console.log('Express server closed');
+          process.exit(0);
+        });
+      }
+    });
+  }
 }
 
-// When Electron is Ready, Create the Window
-app.whenReady().then(() => {
-  createWindow();
-
-  // On macOS, recreate a window when the dock icon is clicked and there are no other windows open.
-  app.on('activate', function () {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
-});
-
-// Handle the 'before-quit' Event to Close the Express Server
-app.on('before-quit', (event) => {
-  console.log('App is quitting. Closing Express server...');
-  
-  // Close the Express server gracefully
-  server.close(() => {
-    console.log('Express server closed.');
-    // Exit the process after the server has closed
-    process.exit(0);
-  });
-
-  // Force quit if the server doesn't close within a timeout
-  setTimeout(() => {
-    console.warn('Forcing app to quit.');
-    process.exit(1);
-  }, 10000); // 10 seconds timeout
-});
-
-// Adjust 'window-all-closed' Behavior
-app.on('window-all-closed', function () {
-  // On macOS, it's common for applications to stay open until the user explicitly quits
-  // However, since we want to quit when the window is closed, override the default behavior
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
+const mainProcess = new MainProcess();
+mainProcess.init();

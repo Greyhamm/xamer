@@ -4,15 +4,15 @@
 <head>
   <meta charset="UTF-8">
   <title>Electron Exam App</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles/main.css">
   <!-- Updated Content Security Policy -->
-  <meta http-equiv="Content-Security-Policy" content="
+    <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self' 'unsafe-inline' https://unpkg.com;
     style-src 'self' 'unsafe-inline' https://unpkg.com;
     font-src 'self' https://unpkg.com;
     connect-src 'self' http://localhost:3000;
-    img-src 'self' http://localhost:3000/uploads/ blob: data;
+    img-src 'self' http://localhost:3000/uploads/ blob: data:;
     worker-src 'self' blob:;
   ">
 </head>
@@ -48,6 +48,6 @@
   </script>
 
   <!-- Include Renderer Script with type="module" -->
-  <script type="module" src="renderer.js"></script>
+  <script type="module" src="index.js"></script>
 </body>
 </html>

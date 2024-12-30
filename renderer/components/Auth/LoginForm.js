@@ -1,114 +1,115 @@
-// renderer/components/Auth/LoginForm.js
-import DOMHelper from '../../helpers/DOMHelper.js';
+import Button from '../common/Button.js';
+import Input from '../common/Input.js';
+import UserState from '../../services/state/UserState.js';
 
 export default class LoginForm {
-    constructor(onSwitchToSignup) {
-      this.state = {
-        email: '',
-        password: '',
-        loading: false
-      };
-      this.onSwitchToSignup = onSwitchToSignup;
-    }
-  
-    render() {
-      const container = DOMHelper.createElement('div', {
-        classes: ['auth-container']
+  constructor(onSwitchToSignup) {
+    this.state = {
+      email: '',
+      password: '',
+      loading: false,
+      error: null
+    };
+    this.onSwitchToSignup = onSwitchToSignup;
+  }
+
+  async handleSubmit(e) {
+    e.preventDefault();
+    if (this.state.loading) return;
+
+    this.setState({ loading: true, error: null });
+    this.submitButton.setLoading(true);
+
+    try {
+      await UserState.login({
+        email: this.state.email,
+        password: this.state.password
       });
-  
-      const form = DOMHelper.createElement('form', {
-        classes: ['auth-form']
-      });
-  
-      // Form fields
-      const emailGroup = this.createFormGroup('email', 'Email', 'email');
-      const passwordGroup = this.createFormGroup('password', 'Password', 'password');
-  
-      // Submit button
-      const submitButton = DOMHelper.createElement('button', {
-        attributes: { type: 'submit' },
-        classes: ['btn', 'btn-primary'],
-        text: 'Login'
-      });
-  
-      // Switch to signup link
-      const switchText = DOMHelper.createElement('p', {
-        classes: ['auth-switch'],
-        html: "Don't have an account? <a href='#' id='switch-to-signup'>Sign up</a>"
-      });
-  
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (this.state.loading) return;
-  
-        this.state.loading = true;
-        submitButton.textContent = 'Logging in...';
-        submitButton.disabled = true;
-  
-        try {
-          const response = await window.api.login({
-            email: this.state.email,
-            password: this.state.password
-          });
-  
-          localStorage.setItem('token', response.token);
-          localStorage.setItem('role', response.role);
-          
-          // Reload page to reinitialize app
-          window.location.reload();
-        } catch (error) {
-          console.error('Login error:', error);
-          alert(error.message || 'Failed to login');
-        } finally {
-          this.state.loading = false;
-          submitButton.textContent = 'Login';
-          submitButton.disabled = false;
-        }
-      });
-  
-      const switchLink = switchText.querySelector('#switch-to-signup');
-      switchLink.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (this.onSwitchToSignup) {
-          this.onSwitchToSignup();
-        }
-      });
-  
-      // Assemble form
-      form.appendChild(emailGroup);
-      form.appendChild(passwordGroup);
-      form.appendChild(submitButton);
-      form.appendChild(switchText);
-      container.appendChild(form);
-  
-      return container;
-    }
-  
-    createFormGroup(id, label, type) {
-      const group = DOMHelper.createElement('div', {
-        classes: ['form-group']
-      });
-  
-      const labelElement = DOMHelper.createElement('label', {
-        attributes: { for: id },
-        text: label
-      });
-  
-      const input = DOMHelper.createElement('input', {
-        attributes: {
-          type: type,
-          id: id,
-          required: true
-        },
-        classes: ['form-control']
-      });
-  
-      input.addEventListener('input', (e) => {
-        this.state[id] = e.target.value;
-      });
-  
-      group.appendChild(labelElement);
-      group.appendChild(input);
-      return group;
+    } catch (error) {
+      this.setState({ error: error.message });
+    } finally {
+      this.setState({ loading: false });
+      this.submitButton.setLoading(false);
     }
   }
+
+  setState(newState) {
+    this.state = { ...this.state, ...newState };
+    this.updateUI();
+  }
+
+  updateUI() {
+    if (this.errorElement) {
+      this.errorElement.style.display = this.state.error ? 'block' : 'none';
+      if (this.state.error) {
+        this.errorElement.textContent = this.state.error;
+      }
+    }
+  }
+
+  render() {
+    const container = document.createElement('div');
+    container.className = 'auth-container';
+
+    const form = document.createElement('form');
+    form.className = 'auth-form';
+
+    // Header
+    const header = document.createElement('div');
+    header.className = 'auth-header';
+    header.innerHTML = `
+      <h2 class="auth-title">Welcome Back</h2>
+      <p class="auth-subtitle">Please sign in to continue</p>
+    `;
+
+    // Error message
+    this.errorElement = document.createElement('div');
+    this.errorElement.className = 'error-message';
+    this.errorElement.style.display = 'none';
+
+    // Email input
+    const emailInput = new Input({
+      type: 'email',
+      placeholder: 'Email',
+      required: true,
+      onChange: (value) => this.setState({ email: value })
+    });
+
+    // Password input
+    const passwordInput = new Input({
+      type: 'password',
+      placeholder: 'Password',
+      required: true,
+      onChange: (value) => this.setState({ password: value })
+    });
+
+    // Submit button
+    this.submitButton = new Button({
+      text: 'Sign In',
+      className: 'btn-primary btn-block',
+      type: 'submit'
+    });
+
+    // Switch to signup link
+    const switchText = document.createElement('p');
+    switchText.className = 'auth-switch';
+    switchText.innerHTML = `Don't have an account? <a href="#" class="switch-link">Sign up</a>`;
+    
+    switchText.querySelector('.switch-link').addEventListener('click', (e) => {
+      e.preventDefault();
+      this.onSwitchToSignup();
+    });
+
+    form.addEventListener('submit', this.handleSubmit.bind(this));
+
+    form.appendChild(header);
+    form.appendChild(this.errorElement);
+    form.appendChild(emailInput.render());
+    form.appendChild(passwordInput.render());
+    form.appendChild(this.submitButton.render());
+    form.appendChild(switchText);
+
+    container.appendChild(form);
+    return container;
+  }
+}

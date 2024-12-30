@@ -1,32 +1,53 @@
-// backend/middleware/auth.js
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const { secret } = require('../config/jwt');
+const ErrorResponse = require('../utils/errorResponse');
+const User = require('../models/User');
+const asyncHandler = require('../utils/asyncHandler');
 
-exports.authenticateUser = (req, res, next) => {
+// Protect routes
+exports.protect = asyncHandler(async (req, res, next) => {
+  let token;
+
+  // Get token from Authorization header
+  if (req.headers.authorization?.startsWith('Bearer')) {
+    token = req.headers.authorization.split(' ')[1];
+  }
+
+  if (!token) {
+    throw new ErrorResponse('Not authorized to access this route', 401);
+  }
+
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    if (!token) {
-      return res.status(401).json({ error: 'Authentication required' });
+    // Verify token
+    const decoded = jwt.verify(token, secret);
+
+    // Get user from token
+    const user = await User.findById(decoded.userId);
+    if (!user) {
+      throw new ErrorResponse('User not found', 401);
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
+    // Add user to request object
+    req.user = {
+      userId: user._id,
+      role: user.role
+    };
+
     next();
-  } catch (error) {
-    res.status(401).json({ error: 'Invalid token' });
+  } catch (err) {
+    throw new ErrorResponse('Not authorized to access this route', 401);
   }
-};
+});
 
-exports.requireTeacher = (req, res, next) => {
-  if (req.user.role !== 'teacher') {
-    return res.status(403).json({ error: 'Access denied. Teachers only.' });
-  }
-  next();
-};
-
-exports.requireStudent = (req, res, next) => {
-  if (req.user.role !== 'student') {
-    return res.status(403).json({ error: 'Access denied. Students only.' });
-  }
-  next();
+// Grant access to specific roles
+exports.authorize = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      throw new ErrorResponse(
+        `User role ${req.user.role} is not authorized to access this route`,
+        403
+      );
+    }
+    next();
+  };
 };

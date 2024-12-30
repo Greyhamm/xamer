@@ -1,0 +1,130 @@
+/* Exam Creator Styles */
+.exam-creator-container {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+  }
+  
+  .question-container {
+    background-color: #f8f9fa;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+  }
+  
+  .question-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+  }
+  
+  .options-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 1rem 0;
+  }
+  
+  .option-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .monaco-editor-container {
+    height: 300px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin: 1rem 0;
+  }
+  
+  /* Exam Taker Styles */
+  .exam-taker-container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  
+  .progress-bar {
+    background-color: #e9ecef;
+    height: 8px;
+    border-radius: 4px;
+    margin: 1rem 0;
+    overflow: hidden;
+  }
+  
+  .progress {
+    background-color: var(--primary-color);
+    height: 100%;
+    transition: width 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.75rem;
+  }
+  
+  .exam-navigation {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 2rem;
+  }
+  
+  /* Grading View Styles */
+  .grading-container {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+  }
+  
+  .grading-section {
+    border-bottom: 1px solid var(--border-color);
+    padding: 1.5rem 0;
+  }
+  
+  .score-input {
+    width: 100px;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+  }
+  
+  .feedback-input {
+    width: 100%;
+    min-height: 100px;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+  }
+  
+  /* Status Badges */
+  .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  
+  .status-badge.draft {
+    background-color: var(--secondary-color);
+    color: white;
+  }
+  
+  .status-badge.published {
+    background-color: var(--success-color);
+    color: white;
+  }
+  
+  .status-badge.submitted {
+    background-color: var(--info-color);
+    color: white;
+  }
+  
+  .status-badge.graded {
+    background-color: var(--primary-color);
+    color: white;
+  }

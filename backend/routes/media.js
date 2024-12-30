@@ -1,30 +1,36 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
+const MediaService = require('../services/MediaService');
+const { protect } = require('../middleware/auth');
+const asyncHandler = require('../utils/asyncHandler');
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/'); // Ensure this directory exists
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
   }
 });
-const upload = multer({ storage: storage });
 
-// POST /uploadMedia
-router.post('/uploadMedia', upload.single('media'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'No file uploaded.' });
-  }
+router.post(
+  '/upload',
+  protect,
+  upload.single('media'),
+  asyncHandler(async (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please upload a file'
+      });
+    }
 
-  // Construct the URL to access the uploaded file
-  const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+    const media = await MediaService.saveFile(req.file);
 
-  res.json({ url: fileUrl });
-});
+    res.status(200).json({
+      success: true,
+      data: media
+    });
+  })
+);
 
 module.exports = router;

@@ -1,264 +1,174 @@
-// renderer/components/Dashboard/StudentDashboard.js
-import DOMHelper from '../../helpers/DOMHelper.js';
-import ExamTaker from '../ExamTaker.js';
-// renderer/components/Dashboard/StudentDashboard.js
+import ExamAPI from '../../services/api/examAPI.js';
+import SubmissionAPI from '../../services/api/submissionAPI.js';
+import { formatDate } from '../../services/utils/formatting.js';
+import AppState from '../../services/state/AppState.js';
+
 export default class StudentDashboard {
-    constructor(user) {
-      this.user = user;
-      this.state = {
-        stats: null,
-        availableExams: [],
-        loading: true
-      };
-    }
-  
-    async fetchData() {
-      try {
-        const [stats, exams] = await Promise.all([
-          window.api.getStudentStats(),
-          window.api.getExams()
-        ]);
-  
-        // Ensure stats has default values
-        this.state.stats = {
-          totalExamsTaken: 0,
-          examsPending: 0,
-          averageScore: 0,
-          recentResults: [],
-          ...stats
-        };
-  
-        // Filter and process exams
-        this.state.availableExams = exams.filter(exam => 
-          exam && exam.status === 'published'
-        ).map(exam => ({
-          ...exam,
-          questions: exam.questions || [] // Ensure questions is always an array
-        }));
-  
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-      } finally {
-        this.state.loading = false;
-      }
-    }
-  
-    createAvailableExamsTable() {
-      const container = DOMHelper.createElement('div', {
-        classes: ['available-exams-section']
-      });
-  
-      const title = DOMHelper.createElement('h3', {
-        text: 'Available Exams',
-        classes: ['section-title']
-      });
-  
-      if (!this.state.availableExams || this.state.availableExams.length === 0) {
-        const noExams = DOMHelper.createElement('p', {
-          text: 'No exams are available at the moment.',
-          classes: ['no-data-message']
-        });
-        container.appendChild(title);
-        container.appendChild(noExams);
-        return container;
-      }
-  
-      const table = DOMHelper.createElement('table', {
-        classes: ['data-table']
-      });
-  
-      const thead = DOMHelper.createElement('thead');
-      thead.innerHTML = `
-        <tr>
-          <th>Exam Title</th>
-          <th>Questions</th>
-          <th>Action</th>
-        </tr>
-      `;
-  
-      const tbody = DOMHelper.createElement('tbody');
-      this.state.availableExams.forEach(exam => {
-        const row = DOMHelper.createElement('tr');
-        
-        // Get question count safely
-        const questionCount = exam.questions ? exam.questions.length : 0;
-  
-        const takeButton = DOMHelper.createElement('button', {
-          classes: ['btn', 'btn-primary'],
-          text: 'Take Exam'
-        });
-  
-        takeButton.addEventListener('click', async () => {
-            const examTaker = new ExamTaker();
-            try {
-              await examTaker.loadExam(exam._id);
-              const mainContent = document.getElementById('main-content');
-              mainContent.innerHTML = '';
-              mainContent.appendChild(examTaker.renderExam(mainContent));
-            } catch (error) {
-              console.error('Error loading exam:', error);
-              alert('Failed to load exam. Please try again.');
-            }
-          });
-  
-        row.innerHTML = `
-          <td>${exam.title || 'Untitled Exam'}</td>
-          <td>${questionCount} question${questionCount === 1 ? '' : 's'}</td>
-        `;
-        
-        const actionCell = DOMHelper.createElement('td');
-        actionCell.appendChild(takeButton);
-        row.appendChild(actionCell);
-        
-        tbody.appendChild(row);
-      });
-  
-      table.appendChild(thead);
-      table.appendChild(tbody);
-      container.appendChild(title);
-      container.appendChild(table);
-  
-      return container;
-    }
-    render() {
-        const container = DOMHelper.createElement('div', {
-          classes: ['dashboard']
-        });
-    
-        // Dashboard Header
-        const header = DOMHelper.createElement('div', {
-          classes: ['dashboard-header']
-        });
-    
-        const title = DOMHelper.createElement('h2', {
-          classes: ['dashboard-title'],
-          text: `Welcome, ${this.user.username}!`
-        });
-    
-        header.appendChild(title);
-        container.appendChild(header);
-    
-        // Loading State
-        const loadingDiv = DOMHelper.createElement('div', {
-          classes: ['loading-container'],
-          text: 'Loading dashboard...'
-        });
-        container.appendChild(loadingDiv);
-    
-        // Fetch and render data
-        this.fetchData().then(() => {
-          loadingDiv.remove();
-          
-          // Stats Cards
-          const statsContainer = DOMHelper.createElement('div', {
-            classes: ['dashboard-stats']
-          });
-    
-          // Create stat cards
-          const statCards = [
-            {
-              title: 'Exams Taken',
-              value: this.state.stats.totalExamsTaken
-            },
-            {
-              title: 'Pending Exams',
-              value: this.state.stats.examsPending
-            },
-            {
-              title: 'Average Score',
-              value: `${Math.round(this.state.stats.averageScore)}%`
-            }
-          ];
-    
-          statCards.forEach(stat => {
-            const card = this.createStatCard(stat.title, stat.value);
-            statsContainer.appendChild(card);
-          });
-    
-          container.appendChild(statsContainer);
-    
-          // Recent Results
-          if (this.state.stats.recentResults.length > 0) {
-            container.appendChild(this.createRecentResultsTable());
-          }
-    
-          // Available Exams
-          if (this.state.availableExams.length > 0) {
-            container.appendChild(this.createAvailableExamsTable());
-          } else {
-            const noExams = DOMHelper.createElement('p', {
-              classes: ['no-exams-message'],
-              text: 'No exams available at the moment.'
-            });
-            container.appendChild(noExams);
-          }
-        });
-    
-        return container;
-      }
-    
-  createStatCard(title, value) {
-    const card = DOMHelper.createElement('div', {
-      classes: ['stat-card']
-    });
-
-    const titleElement = DOMHelper.createElement('div', {
-      classes: ['stat-title'],
-      text: title
-    });
-
-    const valueElement = DOMHelper.createElement('div', {
-      classes: ['stat-value'],
-      text: value
-    });
-
-    card.appendChild(titleElement);
-    card.appendChild(valueElement);
-
-    return card;
+  constructor() {
+    this.state = {
+      stats: null,
+      availableExams: [],
+      recentSubmissions: [],
+      loading: true,
+      error: null
+    };
   }
 
-  createRecentResultsTable() {
-    const container = DOMHelper.createElement('div', {
-      classes: ['results-section']
-    });
+  async loadDashboardData() {
+    try {
+      const [stats, submissions, exams] = await Promise.all([
+        ExamAPI.getStudentStats(),
+        SubmissionAPI.getSubmissions(),
+        ExamAPI.getExams()
+      ]);
 
-    const title = DOMHelper.createElement('h3', {
-      text: 'Recent Results',
-      classes: ['section-title']
-    });
+      // Filter out exams that have already been submitted
+      const submittedExamIds = submissions.map(sub => sub.exam._id);
+      const availableExams = exams.filter(exam => 
+        exam.status === 'published' && !submittedExamIds.includes(exam._id)
+      );
 
-    const table = DOMHelper.createElement('table', {
-      classes: ['data-table']
-    });
+      this.setState({
+        stats,
+        availableExams,
+        recentSubmissions: submissions.slice(0, 5),
+        loading: false
+      });
+    } catch (error) {
+      this.setState({ error: error.message, loading: false });
+    }
+  }
 
-    const thead = DOMHelper.createElement('thead');
-    thead.innerHTML = `
-      <tr>
-        <th>Exam</th>
-        <th>Score</th>
-        <th>Date</th>
-      </tr>
-    `;
+  setState(newState) {
+    this.state = { ...this.state, ...newState };
+    this.updateUI();
+  }
 
-    const tbody = DOMHelper.createElement('tbody');
-    this.state.stats.recentResults.forEach(result => {
-      const row = DOMHelper.createElement('tr');
-      row.innerHTML = `
-        <td>${result.examTitle}</td>
-        <td>${result.score}%</td>
-        <td>${new Date(result.gradedAt).toLocaleDateString()}</td>
+  renderStatsCards() {
+    const container = document.createElement('div');
+    container.className = 'stats-cards';
+
+    const stats = [
+      { label: 'Exams Taken', value: this.state.stats.totalExamsTaken },
+      { label: 'Average Score', value: `${Math.round(this.state.stats.averageScore)}%` },
+      { label: 'Exams Available', value: this.state.availableExams.length },
+      { label: 'Pending Results', value: this.state.stats.pendingResults }
+    ];
+
+    stats.forEach(stat => {
+      const card = document.createElement('div');
+      card.className = 'stat-card';
+      card.innerHTML = `
+        <h3>${stat.label}</h3>
+        <p class="stat-value">${stat.value}</p>
       `;
-      tbody.appendChild(row);
+      container.appendChild(card);
     });
-
-    table.appendChild(thead);
-    table.appendChild(tbody);
-    container.appendChild(title);
-    container.appendChild(table);
 
     return container;
   }
 
+  renderAvailableExams() {
+    const container = document.createElement('div');
+    container.className = 'available-exams section';
 
+    const header = document.createElement('div');
+    header.className = 'section-header';
+    header.innerHTML = '<h3>Available Exams</h3>';
+
+    const examsList = document.createElement('div');
+    examsList.className = 'exams-list';
+
+    if (this.state.availableExams.length === 0) {
+      examsList.innerHTML = '<p class="no-data">No exams available at the moment.</p>';
+    } else {
+      this.state.availableExams.forEach(exam => {
+        const examCard = document.createElement('div');
+        examCard.className = 'exam-card';
+        examCard.innerHTML = `
+          <h4>${exam.title}</h4>
+          <p>Questions: ${exam.questions.length}</p>
+          <p>Created by: ${exam.creator.username}</p>
+          <button class="btn btn-primary">Start Exam</button>
+        `;
+
+        const startButton = examCard.querySelector('button');
+        startButton.addEventListener('click', () => {
+          AppState.navigateTo('examTaker', { examId: exam._id });
+        });
+
+        examsList.appendChild(examCard);
+      });
+    }
+
+    container.appendChild(header);
+    container.appendChild(examsList);
+    return container;
+  }
+
+  renderRecentResults() {
+    const container = document.createElement('div');
+    container.className = 'recent-results section';
+
+    const header = document.createElement('div');
+    header.className = 'section-header';
+    header.innerHTML = '<h3>Recent Results</h3>';
+
+    const resultsList = document.createElement('div');
+    resultsList.className = 'results-list';
+
+    this.state.recentSubmissions.forEach(submission => {
+      const resultCard = document.createElement('div');
+      resultCard.className = 'result-card';
+      resultCard.innerHTML = `
+        <h4>${submission.exam.title}</h4>
+        <p>Submitted: ${formatDate(submission.submittedAt)}</p>
+        <p>Status: <span class="status-badge ${submission.status}">
+          ${submission.status}
+        </span></p>
+        ${submission.status === 'graded' ? 
+          `<p class="score">Score: ${submission.totalScore}%</p>` : 
+          '<p class="pending">Awaiting grading</p>'}
+        <button class="btn btn-secondary">View Details</button>
+      `;
+
+      const viewButton = resultCard.querySelector('button');
+      viewButton.addEventListener('click', () => {
+        AppState.navigateTo('submissionDetails', { submissionId: submission._id });
+      });
+
+      resultsList.appendChild(resultCard);
+    });
+
+    container.appendChild(header);
+    container.appendChild(resultsList);
+    return container;
+  }
+
+  render() {
+    const container = document.createElement('div');
+    container.className = 'student-dashboard';
+
+    if (this.state.loading) {
+      container.innerHTML = '<div class="loading">Loading dashboard data...</div>';
+      this.loadDashboardData();
+      return container;
+    }
+
+    if (this.state.error) {
+      container.innerHTML = `<div class="error">${this.state.error}</div>`;
+      return container;
+    }
+
+    const header = document.createElement('div');
+    header.className = 'dashboard-header';
+    header.innerHTML = `<h2>Student Dashboard</h2>`;
+
+    container.appendChild(header);
+    container.appendChild(this.renderStatsCards());
+    container.appendChild(this.renderAvailableExams());
+    container.appendChild(this.renderRecentResults());
+
+    return container;
+  }
 }

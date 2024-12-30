@@ -1,82 +1,83 @@
-// backend/controllers/AuthController.js
 const User = require('../models/User');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const ErrorResponse = require('../utils/errorResponse');
+const asyncHandler = require('../utils/asyncHandler');
 
 class AuthController {
-  static async signup(req, res) {
-    try {
-      const { username, email, password, role } = req.body;
+  // @desc    Register user
+  // @route   POST /api/auth/signup
+  // @access  Public
+  register = asyncHandler(async (req, res) => {
+    const { username, email, password, role } = req.body;
 
-      // Validate role
-      if (!['student', 'teacher'].includes(role)) {
-        return res.status(400).json({ error: 'Invalid role' });
-      }
-
-      // Check if user exists
-      const existingUser = await User.findOne({ $or: [{ email }, { username }] });
-      if (existingUser) {
-        return res.status(400).json({ error: 'User already exists' });
-      }
-
-      // Create user
-      const user = new User({ username, email, password, role });
-      await user.save();
-
-      const token = jwt.sign(
-        { userId: user._id, role: user.role },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-
-      res.status(201).json({ token, role: user.role });
-    } catch (error) {
-      console.error('Signup error:', error);
-      res.status(500).json({ error: 'Error creating user' });
+    // Validate role
+    if (!['student', 'teacher'].includes(role)) {
+      throw new ErrorResponse('Invalid role', 400);
     }
-  }
 
-  static async login(req, res) {
-    try {
-      const { email, password } = req.body;
-
-      const user = await User.findOne({ email });
-      if (!user) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-
-      const isValidPassword = await bcrypt.compare(password, user.password);
-      if (!isValidPassword) {
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-
-      const token = jwt.sign(
-        { userId: user._id, role: user.role },
-        JWT_SECRET,
-        { expiresIn: '24h' }
-      );
-
-      res.json({ token, role: user.role });
-    } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({ error: 'Error logging in' });
+    // Check for existing user
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+    if (existingUser) {
+      throw new ErrorResponse('User already exists', 400);
     }
-  }
 
-  static async getProfile(req, res) {
-    try {
-      const user = await User.findById(req.user.userId).select('-password');
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      res.json(user);
-    } catch (error) {
-      console.error('Get profile error:', error);
-      res.status(500).json({ error: 'Error fetching profile' });
+    // Create user
+    const user = await User.create({
+      username,
+      email,
+      password,
+      role
+    });
+
+    this.sendTokenResponse(user, 201, res);
+  });
+
+  // @desc    Login user
+  // @route   POST /api/auth/login
+  // @access  Public
+  login = asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+
+    // Validate email & password
+    if (!email || !password) {
+      throw new ErrorResponse('Please provide an email and password', 400);
     }
-  }
+
+    // Check for user
+    const user = await User.findOne({ email }).select('+password');
+    if (!user) {
+      throw new ErrorResponse('Invalid credentials', 401);
+    }
+
+    // Check password
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      throw new ErrorResponse('Invalid credentials', 401);
+    }
+
+    this.sendTokenResponse(user, 200, res);
+  });
+
+  // @desc    Get current logged in user
+  // @route   GET /api/auth/profile
+  // @access  Private
+  getProfile = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user.userId);
+    res.status(200).json({
+      success: true,
+      data: user
+    });
+  });
+
+  // Helper method to send token response
+  sendTokenResponse = (user, statusCode, res) => {
+    const token = user.getSignedJwtToken();
+
+    res.status(statusCode).json({
+      success: true,
+      token,
+      role: user.role
+    });
+  };
 }
 
-module.exports = AuthController;
+module.exports = new AuthController();
