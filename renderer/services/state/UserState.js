@@ -1,4 +1,4 @@
-import AuthAPI from '../api/authApi';
+import AuthAPI from '../api/authAPI.js';
 
 class UserState {
   constructor() {

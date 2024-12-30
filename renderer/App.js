@@ -1,6 +1,6 @@
 import AppState from './services/state/AppState.js';
 import UserState from './services/state/UserState.js';
-import AuthManager from './components/Auth/AuthManager.js';
+import AuthManager from './components/auth/AuthManager.js';
 import TeacherDashboard from './components/dashboard/TeacherDashboard.js';
 import StudentDashboard from './components/dashboard/StudentDashboard.js';
 import ExamCreator from './components/exam/creation/ExamCreator.js';

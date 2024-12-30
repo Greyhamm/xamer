@@ -1,5 +1,5 @@
 import App from './App.js';
-import './styles/main.css';
+// import './styles/main.css';
 
 // Wait for DOM content to be loaded
 document.addEventListener('DOMContentLoaded', () => {

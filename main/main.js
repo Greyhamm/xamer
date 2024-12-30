@@ -17,18 +17,16 @@ class MainProcess {
     this.expressApp.use(cors());
     this.expressApp.use(express.json());
     
-    // Serve static files - add these lines
-    this.expressApp.use(express.static(path.join(__dirname, '..')));
+    // Serve renderer static files first
     this.expressApp.use('/renderer', express.static(path.join(__dirname, '..', 'renderer')));
-    this.expressApp.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
-    
-    // Routes
-    this.expressApp.use('/api/auth', require('../backend/routes/auth'));
-    this.expressApp.use('/api/exams', require('../backend/routes/exam'));
-    this.expressApp.use('/api', require('../backend/routes/submission'));
-    this.expressApp.use('/api', require('../backend/routes/codeExecution'));
-    this.expressApp.use('/api/media', require('../backend/routes/media'));
 
+    // Serve uploads
+    this.expressApp.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+
+    // Serve other static files
+    // Removed serving the parent directory to prevent MIME type issues
+    // this.expressApp.use(express.static(path.join(__dirname, '..')));
+    
     const port = process.env.PORT || 3000;
     this.server = this.expressApp.listen(port, () => {
         console.log(`Express server running on port ${port}`);
