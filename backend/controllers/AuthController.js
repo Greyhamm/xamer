@@ -1,13 +1,17 @@
 const User = require('../models/User');
 const ErrorResponse = require('../utils/errorResponse');
 const asyncHandler = require('../utils/asyncHandler');
+const bcrypt = require('bcrypt');
 
 class AuthController {
   // @desc    Register user
   // @route   POST /api/auth/signup
   // @access  Public
   register = asyncHandler(async (req, res) => {
+    console.log('Received body:', req.body); // Log entire request body
+
     const { username, email, password, role } = req.body;
+    console.log('Received role:', role);
 
     // Validate role
     if (!['student', 'teacher'].includes(role)) {
@@ -20,15 +24,30 @@ class AuthController {
       throw new ErrorResponse('User already exists', 400);
     }
 
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    console.log('Password hashed successfully.');
+
     // Create user
     const user = await User.create({
       username,
       email,
-      password,
+      password: hashedPassword,
       role
     });
+    console.log('User created successfully:', user);
 
-    this.sendTokenResponse(user, 201, res);
+    // Generate JWT Token
+    const token = user.getSignedJwtToken();
+    console.log('JWT token generated:', token);
+
+    // Send response
+    res.status(201).json({
+      success: true,
+      token,
+      role: user.role
+    });
   });
 
   // @desc    Login user
@@ -36,8 +55,9 @@ class AuthController {
   // @access  Public
   login = asyncHandler(async (req, res) => {
     const { email, password } = req.body;
+    console.log('Login attempt:', { email, password });
 
-    // Validate email & password
+    // Validate email and password
     if (!email || !password) {
       throw new ErrorResponse('Please provide an email and password', 400);
     }
@@ -48,13 +68,21 @@ class AuthController {
       throw new ErrorResponse('Invalid credentials', 401);
     }
 
-    // Check password
-    const isMatch = await user.matchPassword(password);
+    // Check if password matches
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       throw new ErrorResponse('Invalid credentials', 401);
     }
 
-    this.sendTokenResponse(user, 200, res);
+    // Generate JWT Token
+    const token = user.getSignedJwtToken();
+    console.log('JWT token generated for login:', token);
+
+    res.status(200).json({
+      success: true,
+      token,
+      role: user.role
+    });
   });
 
   // @desc    Get current logged in user

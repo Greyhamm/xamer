@@ -1,4 +1,4 @@
-import ExamAPI from '../../services/api/examAPI.js';
+import ExamState from '../../services/state/ExamState.js';
 import SubmissionAPI from '../../services/api/submissionAPI.js';
 import { formatDate } from '../../services/utils/formating.js';
 import AppState from '../../services/state/AppState.js';
@@ -12,23 +12,21 @@ export default class TeacherDashboard {
       loading: true,
       error: null
     };
+    this.loadDashboardData = this.loadDashboardData.bind(this);
+    this.updateUI = this.updateUI.bind(this);
+    this.render = this.render.bind(this);
+
+    this.loadDashboardData();
   }
 
   async loadDashboardData() {
     try {
-      const [stats, submissions, exams] = await Promise.all([
-        ExamAPI.getTeacherStats(),
-        SubmissionAPI.getSubmissions(),
-        ExamAPI.getExams()
-      ]);
-
-      this.setState({
-        stats,
-        recentSubmissions: submissions.slice(0, 5),
-        recentExams: exams.slice(0, 5),
-        loading: false
-      });
+      const stats = await ExamState.getStats();
+      const recentExams = await ExamState.getRecentExams();
+      const recentSubmissions = await ExamState.getRecentSubmissions();
+      this.setState({ stats, recentExams, recentSubmissions, loading: false });
     } catch (error) {
+      console.error('Failed to load dashboard data:', error);
       this.setState({ error: error.message, loading: false });
     }
   }
@@ -36,6 +34,15 @@ export default class TeacherDashboard {
   setState(newState) {
     this.state = { ...this.state, ...newState };
     this.updateUI();
+  }
+
+  updateUI() {
+    // Re-render the dashboard with the updated state
+    const dashboardContainer = document.querySelector('.teacher-dashboard');
+    if (dashboardContainer) {
+      dashboardContainer.innerHTML = '';
+      dashboardContainer.appendChild(this.render());
+    }
   }
 
   renderStatsCards() {
@@ -52,10 +59,7 @@ export default class TeacherDashboard {
     stats.forEach(stat => {
       const card = document.createElement('div');
       card.className = 'stat-card';
-      card.innerHTML = `
-        <h3>${stat.label}</h3>
-        <p class="stat-value">${stat.value}</p>
-      `;
+      card.innerHTML = `<h4>${stat.label}</h4><p>${stat.value}</p>`;
       container.appendChild(card);
     });
 
@@ -70,10 +74,10 @@ export default class TeacherDashboard {
     header.className = 'section-header';
     header.innerHTML = `
       <h3>Recent Exams</h3>
-      <button class="btn btn-primary">Create New Exam</button>
+      <button class="btn btn-primary" id="create-exam-btn">Create New Exam</button>
     `;
 
-    const createExamButton = header.querySelector('button');
+    const createExamButton = header.querySelector('#create-exam-btn');
     createExamButton.addEventListener('click', () => {
       AppState.navigateTo('examCreator');
     });
@@ -128,10 +132,10 @@ export default class TeacherDashboard {
     header.className = 'section-header';
     header.innerHTML = `
       <h3>Recent Submissions</h3>
-      <button class="btn btn-secondary">View All</button>
+      <button class="btn btn-secondary" id="view-all-submissions-btn">View All</button>
     `;
 
-    const viewAllButton = header.querySelector('button');
+    const viewAllButton = header.querySelector('#view-all-submissions-btn');
     viewAllButton.addEventListener('click', () => {
       AppState.navigateTo('submissionsList');
     });
@@ -172,21 +176,20 @@ export default class TeacherDashboard {
     container.className = 'teacher-dashboard';
 
     if (this.state.loading) {
-      container.innerHTML = '<div class="loading">Loading dashboard data...</div>';
-      this.loadDashboardData();
+      const loading = document.createElement('p');
+      loading.textContent = 'Loading dashboard data...';
+      container.appendChild(loading);
       return container;
     }
 
     if (this.state.error) {
-      container.innerHTML = `<div class="error">${this.state.error}</div>`;
+      const error = document.createElement('p');
+      error.className = 'error-message';
+      error.textContent = `Error: ${this.state.error}`;
+      container.appendChild(error);
       return container;
     }
 
-    const header = document.createElement('div');
-    header.className = 'dashboard-header';
-    header.innerHTML = `<h2>Teacher Dashboard</h2>`;
-
-    container.appendChild(header);
     container.appendChild(this.renderStatsCards());
     container.appendChild(this.renderRecentExams());
     container.appendChild(this.renderRecentSubmissions());

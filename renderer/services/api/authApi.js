@@ -1,71 +1,93 @@
 class AuthAPI {
     static async login(credentials) {
-      try {
-        const response = await window.api.login(credentials);
-        this.handleAuthResponse(response);
-        return response;
-      } catch (error) {
-        throw this.handleError(error);
-      }
-    }
-  
-    static async signup(userData) {
-      try {
-        // Add explicit endpoint URL and headers
-        const response = await window.api.signup({
-          endpoint: '/auth/signup', // Remove /api prefix if not needed
-          data: userData,
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error(`Signup failed: ${response.statusText}`);
+        try {
+            // Pass the correct options including endpoint and headers
+            const responseData = await window.api.login({
+                endpoint: '/auth/login',
+                data: credentials,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            console.log('Received response data:', responseData); // Added log
+            console.log('Response success:', responseData.success); // Added log
+
+            // Check if the response indicates a successful login
+            if (!responseData.success) {
+                throw new Error(responseData.message || 'Login failed');
+            }
+
+            // Handle authentication response
+            this.handleAuthResponse(responseData);
+            return responseData;
+        } catch (error) {
+            throw this.handleError(error);
         }
-        
-        this.handleAuthResponse(response);
-        return response;
-      } catch (error) {
-        throw this.handleError(error);
-      }
     }
-  
+
+    static async signup(userData) {
+        try {
+            const responseData = await window.api.signup({
+                endpoint: '/auth/signup',
+                data: userData,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!responseData.success) {
+                throw new Error(responseData.message || 'Signup failed');
+            }
+
+            this.handleAuthResponse(responseData);
+            return responseData;
+        } catch (error) {
+            throw this.handleError(error);
+        }
+    }
+
     static async getProfile() {
-      try {
-        return await window.api.getProfile();
-      } catch (error) {
-        throw this.handleError(error);
-      }
+        try {
+            const responseData = await window.api.getProfile();
+
+            if (!responseData.success) {
+                throw new Error(responseData.message || 'Failed to fetch profile');
+            }
+
+            return responseData;
+        } catch (error) {
+            throw this.handleError(error);
+        }
     }
-  
-    static handleAuthResponse(response) {
-      if (response.token) {
-        localStorage.setItem('token', response.token);
-        localStorage.setItem('role', response.role);
-      }
+
+    static handleAuthResponse(responseData) {
+        if (responseData.token) {
+            localStorage.setItem('token', responseData.token);
+            localStorage.setItem('role', responseData.role);
+            console.log('Token and role stored successfully.'); // Added log
+        }
     }
-  
+
     static handleError(error) {
-      console.error('Auth API Error:', error);
-      // Improve error message
-      const message = error.message || 'Authentication failed. Please try again.';
-      return new Error(message);
+        console.error('Auth API Error:', error);
+        const message = error.message || 'Authentication failed. Please try again.';
+        return new Error(message);
     }
-  
+
     static logout() {
-      localStorage.removeItem('token');
-      localStorage.removeItem('role');
-      window.location.reload();
+        localStorage.removeItem('token');
+        localStorage.removeItem('role');
+        window.location.reload();
     }
-  
+
     static isAuthenticated() {
-      return !!localStorage.getItem('token');
+        return !!localStorage.getItem('token');
     }
-  
+
     static getRole() {
-      return localStorage.getItem('role');
+        return localStorage.getItem('role');
     }
-  }
-  
-  export default AuthAPI;
+}
+
+export default AuthAPI;

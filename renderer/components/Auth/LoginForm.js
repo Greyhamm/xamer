@@ -1,6 +1,7 @@
 import Button from '../common/Button.js';
 import Input from '../common/Input.js';
 import UserState from '../../services/state/UserState.js';
+import AppState from '../../services/state/AppState.js'; // Added import
 
 export default class LoginForm {
   constructor(onSwitchToSignup) {
@@ -11,6 +12,9 @@ export default class LoginForm {
       error: null
     };
     this.onSwitchToSignup = onSwitchToSignup;
+
+    // Bind methods if necessary
+    this.handleSubmit = this.handleSubmit.bind(this);
   }
 
   async handleSubmit(e) {
@@ -18,13 +22,20 @@ export default class LoginForm {
     if (this.state.loading) return;
 
     this.setState({ loading: true, error: null });
-    this.submitButton.setLoading(true);
 
     try {
-      await UserState.login({
+      const result = await UserState.login({
         email: this.state.email,
         password: this.state.password
       });
+
+      if (result.role === 'teacher') {
+        AppState.navigateTo('teacherDashboard');
+      } else if (result.role === 'student') {
+        AppState.navigateTo('studentDashboard');
+      } else {
+        this.setState({ error: 'Unknown user role' });
+      }
     } catch (error) {
       this.setState({ error: error.message });
     } finally {
@@ -72,7 +83,9 @@ export default class LoginForm {
       type: 'email',
       placeholder: 'Email',
       required: true,
-      onChange: (value) => this.setState({ email: value })
+      onChange: (value) => {
+        this.setState({ email: value });
+      }
     });
 
     // Password input
@@ -80,7 +93,9 @@ export default class LoginForm {
       type: 'password',
       placeholder: 'Password',
       required: true,
-      onChange: (value) => this.setState({ password: value })
+      onChange: (value) => {
+        this.setState({ password: value });
+      }
     });
 
     // Submit button
@@ -100,8 +115,8 @@ export default class LoginForm {
       this.onSwitchToSignup();
     });
 
-    form.addEventListener('submit', this.handleSubmit.bind(this));
-
+    // Append elements to form
+    form.addEventListener('submit', this.handleSubmit);
     form.appendChild(header);
     form.appendChild(this.errorElement);
     form.appendChild(emailInput.render());

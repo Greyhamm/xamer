@@ -50,6 +50,9 @@ export default class SignupForm {
       return;
     }
 
+    // Add this line to log the current role
+    console.log('Submitting with role:', this.state.role);
+
     this.setState({ loading: true, error: null });
     this.submitButton.setLoading(true);
 
@@ -58,7 +61,7 @@ export default class SignupForm {
         username: this.state.username,
         email: this.state.email,
         password: this.state.password,
-        role: this.state.role
+        role: this.state.role // Ensure 'role' is included
       });
 
       if (!result) {

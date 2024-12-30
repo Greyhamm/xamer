@@ -145,29 +145,22 @@ export default class StudentDashboard {
     return container;
   }
 
-  render() {
+  async render() {
     const container = document.createElement('div');
     container.className = 'student-dashboard';
 
-    if (this.state.loading) {
-      container.innerHTML = '<div class="loading">Loading dashboard data...</div>';
-      this.loadDashboardData();
-      return container;
+    // Example functionality using SubmissionAPI
+    try {
+      const submissions = await SubmissionAPI.getSubmissions();
+      submissions.forEach((submission) => {
+        const submissionElement = document.createElement('div');
+        submissionElement.textContent = `Submission ID: ${submission.id}, Status: ${submission.status}`;
+        container.appendChild(submissionElement);
+      });
+    } catch (error) {
+      console.error('Failed to load submissions:', error);
+      container.innerHTML += '<p>Failed to load submissions.</p>';
     }
-
-    if (this.state.error) {
-      container.innerHTML = `<div class="error">${this.state.error}</div>`;
-      return container;
-    }
-
-    const header = document.createElement('div');
-    header.className = 'dashboard-header';
-    header.innerHTML = `<h2>Student Dashboard</h2>`;
-
-    container.appendChild(header);
-    container.appendChild(this.renderStatsCards());
-    container.appendChild(this.renderAvailableExams());
-    container.appendChild(this.renderRecentResults());
 
     return container;
   }

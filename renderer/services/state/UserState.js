@@ -1,4 +1,4 @@
-import AuthAPI from '../api/authAPI.js';
+import AuthAPI from '../api/authApi.js';
 
 class UserState {
   constructor() {
@@ -52,10 +52,8 @@ class UserState {
     return this.user?.role === 'student';
   }
 
-  async login(credentials) {
-    const response = await AuthAPI.login(credentials);
-    await this.initialize();
-    return response;
+  async login(userData) {
+    return await AuthAPI.login(userData);
   }
 
   async signup(userData) {

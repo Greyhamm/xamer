@@ -1,36 +1,42 @@
-const { contextBridge } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 class PreloadBridge {
   constructor() {
-    this.baseUrl = 'http://localhost:3000/api';
+    // Initialize any necessary properties
   }
 
   // Helper to get auth header
   getAuthHeader() {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('token'); // Example token retrieval
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   }
 
   // Generic fetch wrapper
-  async fetchApi(endpoint, options = {}) {
+  async fetchApi({ endpoint, data = {}, method = 'POST', headers = {} } = {}) {
+    const defaultHeaders = {
+      'Content-Type': 'application/json',
+      ...this.getAuthHeader(),
+      ...headers
+    };
+
     try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          ...this.getAuthHeader(),
-          ...options.headers
-        }
+      const response = await fetch(`http://localhost:3000/api${endpoint}`, {
+        method,
+        headers: defaultHeaders,
+        body: method !== 'GET' ? JSON.stringify(data) : undefined
       });
 
+      // Check if response is OK
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'API request failed');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'API request failed');
       }
 
-      return await response.json();
+      const responseData = await response.json(); // Parse JSON here
+
+      return responseData; // Return parsed data
     } catch (error) {
-      console.error(`API Error (${endpoint}):`, error);
+      console.error(`Fetch API Error at ${endpoint}:`, error);
       throw error;
     }
   }
@@ -38,68 +44,37 @@ class PreloadBridge {
   // Expose API methods to renderer
   exposeApi() {
     contextBridge.exposeInMainWorld('api', {
-      // Auth endpoints
-      login: (credentials) => this.fetchApi('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(credentials)
-      }),
+      signup: (options) => this.fetchApi({ endpoint: options.endpoint, data: options.data, method: 'POST', headers: options.headers }),
+      login: (options) => this.fetchApi({ endpoint: options.endpoint, data: options.data, method: 'POST', headers: options.headers }),
+      getProfile: () => this.fetchApi({ endpoint: '/auth/profile', method: 'GET' }),
 
-      signup: (userData) => this.fetchApi('/auth/signup', {
-        method: 'POST',
-        body: JSON.stringify(userData)
-      }),
+      createExam: (examData) => ipcRenderer.invoke('create-exam', examData),
+      publishExam: (examId) => ipcRenderer.invoke('publish-exam', examId),
+      getExams: () => ipcRenderer.invoke('get-exams'),
+      getExamById: (examId) => ipcRenderer.invoke('get-exam-by-id', examId),
 
-      getProfile: () => this.fetchApi('/auth/profile'),
+      // Added Methods
+      getExamStats: () => ipcRenderer.invoke('get-exam-stats'),
+      getRecentExams: () => ipcRenderer.invoke('get-recent-exams'),
+      getRecentSubmissions: () => ipcRenderer.invoke('get-recent-submissions'),
 
-      // Exam endpoints
-      createExam: (examData) => this.fetchApi('/exams', {
-        method: 'POST',
-        body: JSON.stringify(examData)
-      }),
+      submitExam: (examId, answers) => this.fetchApi({ endpoint: `/exams/${examId}/submit`, data: { answers }, method: 'POST' }),
 
-      getExams: () => this.fetchApi('/exams'),
+      getSubmissions: () => this.fetchApi({ endpoint: '/submissions', method: 'GET' }),
 
-      getExamById: (id) => this.fetchApi(`/exams/${id}`),
+      gradeSubmission: (submissionId, grades) => this.fetchApi({ endpoint: `/submissions/${submissionId}/grade`, data: { grades }, method: 'POST' }),
 
-      publishExam: (id) => this.fetchApi(`/exams/${id}/publish`, {
-        method: 'POST'
-      }),
+      executeJavaScript: (code) => this.fetchApi({ endpoint: '/execute/javascript', data: { code }, method: 'POST' }),
 
-      // Submission endpoints
-      submitExam: (examId, answers) => this.fetchApi(`/exams/${examId}/submit`, {
-        method: 'POST',
-        body: JSON.stringify({ answers })
-      }),
+      executePython: (code) => this.fetchApi({ endpoint: '/execute/python', data: { code }, method: 'POST' }),
 
-      getSubmissions: () => this.fetchApi('/submissions'),
+      executeJava: (code) => this.fetchApi({ endpoint: '/execute/java', data: { code }, method: 'POST' }),
 
-      gradeSubmission: (submissionId, grades) => this.fetchApi(`/submissions/${submissionId}/grade`, {
-        method: 'POST',
-        body: JSON.stringify({ grades })
-      }),
-
-      // Code execution endpoints
-      executeJavaScript: (code) => this.fetchApi('/execute/javascript', {
-        method: 'POST',
-        body: JSON.stringify({ code })
-      }),
-
-      executePython: (code) => this.fetchApi('/execute/python', {
-        method: 'POST',
-        body: JSON.stringify({ code })
-      }),
-
-      executeJava: (code) => this.fetchApi('/execute/java', {
-        method: 'POST',
-        body: JSON.stringify({ code })
-      }),
-
-      // Media upload
       uploadMedia: async (file) => {
         const formData = new FormData();
         formData.append('media', file);
 
-        const response = await fetch(`${this.baseUrl}/media/upload`, {
+        const response = await fetch(`http://localhost:3000/api/media/upload`, {
           method: 'POST',
           headers: this.getAuthHeader(),
           body: formData
