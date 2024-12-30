@@ -16,18 +16,45 @@ export default class TeacherDashboard {
     this.updateUI = this.updateUI.bind(this);
     this.render = this.render.bind(this);
 
+    // Add listener to ExamState
+    ExamState.addListener(this.onExamStateChange.bind(this));
+
     this.loadDashboardData();
   }
 
+  onExamStateChange(state) {
+    // Update state based on ExamState changes
+    if (state.stats) {
+      this.state.stats = state.stats;
+    }
+    if (state.recentExams) {
+      this.state.recentExams = state.recentExams;
+    }
+    if (state.recentSubmissions) {
+      this.state.recentSubmissions = state.recentSubmissions;
+    }
+    this.updateUI();
+  }
+
   async loadDashboardData() {
+    console.log('Loading dashboard data...');
     try {
-      const stats = await ExamState.getStats();
-      const recentExams = await ExamState.getRecentExams();
-      const recentSubmissions = await ExamState.getRecentSubmissions();
-      this.setState({ stats, recentExams, recentSubmissions, loading: false });
+      this.state.loading = true;
+      this.updateUI();
+
+      await Promise.all([
+        ExamState.getStats(),
+        ExamState.getRecentExams(),
+        ExamState.getRecentSubmissions()
+      ]);
+
+      this.state.loading = false;
+      this.updateUI();
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
-      this.setState({ error: error.message, loading: false });
+      this.state.error = error.message;
+      this.state.loading = false;
+      this.updateUI();
     }
   }
 
@@ -48,6 +75,13 @@ export default class TeacherDashboard {
   renderStatsCards() {
     const container = document.createElement('div');
     container.className = 'stats-cards';
+
+    if (!this.state.stats) {
+      const noStats = document.createElement('p');
+      noStats.textContent = 'No statistics available.';
+      container.appendChild(noStats);
+      return container;
+    }
 
     const stats = [
       { label: 'Total Exams', value: this.state.stats.totalExams },
@@ -85,39 +119,50 @@ export default class TeacherDashboard {
     const examsList = document.createElement('div');
     examsList.className = 'exams-list';
 
-    this.state.recentExams.forEach(exam => {
-      const examCard = document.createElement('div');
-      examCard.className = 'exam-card';
-      examCard.innerHTML = `
-        <h4>${exam.title}</h4>
-        <p>Status: <span class="status-badge ${exam.status}">${exam.status}</span></p>
-        <p>Questions: ${exam.questions.length}</p>
-        <p>Created: ${formatDate(exam.createdAt)}</p>
-        <div class="card-actions">
-          <button class="btn btn-secondary">View Details</button>
-          ${exam.status === 'draft' ? '<button class="btn btn-primary">Publish</button>' : ''}
-        </div>
-      `;
+    if (!Array.isArray(this.state.recentExams)) {
+      console.error('recentExams is not an array:', this.state.recentExams);
+      const errorMsg = document.createElement('p');
+      errorMsg.textContent = 'Error loading recent exams.';
+      examsList.appendChild(errorMsg);
+    } else if (this.state.recentExams.length === 0) {
+      const noExams = document.createElement('p');
+      noExams.textContent = 'No recent exams found.';
+      examsList.appendChild(noExams);
+    } else {
+      this.state.recentExams.forEach(exam => {
+        const examCard = document.createElement('div');
+        examCard.className = 'exam-card';
+        examCard.innerHTML = `
+          <h4>${exam.title}</h4>
+          <p>Status: <span class="status-badge ${exam.status}">${exam.status}</span></p>
+          <p>Questions: ${exam.questions.length}</p>
+          <p>Created: ${formatDate(exam.createdAt)}</p>
+          <div class="card-actions">
+            <button class="btn btn-secondary">View Details</button>
+            ${exam.status === 'draft' ? '<button class="btn btn-primary">Publish</button>' : ''}
+          </div>
+        `;
 
-      const viewButton = examCard.querySelector('.btn-secondary');
-      viewButton.addEventListener('click', () => {
-        AppState.navigateTo('examDetails', { examId: exam._id });
-      });
-
-      const publishButton = examCard.querySelector('.btn-primary');
-      if (publishButton) {
-        publishButton.addEventListener('click', async () => {
-          try {
-            await ExamAPI.publishExam(exam._id);
-            this.loadDashboardData();
-          } catch (error) {
-            alert('Failed to publish exam: ' + error.message);
-          }
+        const viewButton = examCard.querySelector('.btn-secondary');
+        viewButton.addEventListener('click', () => {
+          AppState.navigateTo('examDetails', { examId: exam._id });
         });
-      }
 
-      examsList.appendChild(examCard);
-    });
+        const publishButton = examCard.querySelector('.btn-primary');
+        if (publishButton) {
+          publishButton.addEventListener('click', async () => {
+            try {
+              await ExamAPI.publishExam(exam._id);
+              this.loadDashboardData();
+            } catch (error) {
+              alert('Failed to publish exam: ' + error.message);
+            }
+          });
+        }
+
+        examsList.appendChild(examCard);
+      });
+    }
 
     container.appendChild(header);
     container.appendChild(examsList);
@@ -143,28 +188,39 @@ export default class TeacherDashboard {
     const submissionsList = document.createElement('div');
     submissionsList.className = 'submissions-list';
 
-    this.state.recentSubmissions.forEach(submission => {
-      const submissionCard = document.createElement('div');
-      submissionCard.className = 'submission-card';
-      submissionCard.innerHTML = `
-        <div class="submission-info">
-          <h4>${submission.exam.title}</h4>
-          <p>Student: ${submission.student.username}</p>
-          <p>Submitted: ${formatDate(submission.submittedAt)}</p>
-          <p>Status: <span class="status-badge ${submission.status}">${submission.status}</span></p>
-        </div>
-        <button class="btn btn-${submission.status === 'graded' ? 'secondary' : 'primary'}">
-          ${submission.status === 'graded' ? 'Review' : 'Grade'}
-        </button>
-      `;
+    if (!Array.isArray(this.state.recentSubmissions)) {
+      console.error('recentSubmissions is not an array:', this.state.recentSubmissions);
+      const errorMsg = document.createElement('p');
+      errorMsg.textContent = 'Error loading recent submissions.';
+      submissionsList.appendChild(errorMsg);
+    } else if (this.state.recentSubmissions.length === 0) {
+      const noSubmissions = document.createElement('p');
+      noSubmissions.textContent = 'No recent submissions found.';
+      submissionsList.appendChild(noSubmissions);
+    } else {
+      this.state.recentSubmissions.forEach(submission => {
+        const submissionCard = document.createElement('div');
+        submissionCard.className = 'submission-card';
+        submissionCard.innerHTML = `
+          <div class="submission-info">
+            <h4>${submission.exam.title}</h4>
+            <p>Student: ${submission.student.username}</p>
+            <p>Submitted: ${formatDate(submission.submittedAt)}</p>
+            <p>Status: <span class="status-badge ${submission.status}">${submission.status}</span></p>
+          </div>
+          <button class="btn btn-${submission.status === 'graded' ? 'secondary' : 'primary'}">
+            ${submission.status === 'graded' ? 'Review' : 'Grade'}
+          </button>
+        `;
 
-      const actionButton = submissionCard.querySelector('button');
-      actionButton.addEventListener('click', () => {
-        AppState.navigateTo('gradingView', { submissionId: submission._id });
+        const actionButton = submissionCard.querySelector('button');
+        actionButton.addEventListener('click', () => {
+          AppState.navigateTo('gradingView', { submissionId: submission._id });
+        });
+
+        submissionsList.appendChild(submissionCard);
       });
-
-      submissionsList.appendChild(submissionCard);
-    });
+    }
 
     container.appendChild(header);
     container.appendChild(submissionsList);

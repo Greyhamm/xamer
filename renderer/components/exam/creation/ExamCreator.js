@@ -89,7 +89,7 @@ export default class ExamCreator {
       const response = await ExamState.saveExam(examData);
       
       if (publish) {
-        await ExamState.publishExam(response.data._id);
+        await ExamState.publishExam(response._id);
       }
 
       // Clear form

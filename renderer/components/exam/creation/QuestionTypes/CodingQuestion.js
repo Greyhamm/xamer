@@ -61,8 +61,13 @@ export default class CodingQuestion extends BaseQuestion {
     languageSelect.addEventListener('change', (e) => {
       this.setState({ language: e.target.value });
       if (this.editor) {
-        this.editor.updateLanguage(e.target.value);
+        this.editor.dispose();
       }
+      this.editor = new MonacoEditor({
+        language: this.state.language,
+        value: this.state.initialCode,
+        onChange: (value) => this.setState({ initialCode: value })
+      });
     });
 
     languageGroup.appendChild(languageSelect);
@@ -76,6 +81,11 @@ export default class CodingQuestion extends BaseQuestion {
       value: this.state.initialCode,
       onChange: (value) => this.setState({ initialCode: value })
     });
+
+    // Initialize Monaco editor after container is added to DOM
+    setTimeout(() => {
+      this.editor.mount(editorContainer);
+    }, 0);
 
     // Test cases
     const testCasesContainer = document.createElement('div');
@@ -113,11 +123,6 @@ export default class CodingQuestion extends BaseQuestion {
     container.appendChild(testCasesContainer);
     container.appendChild(executeButton.render());
     container.appendChild(outputContainer);
-
-    // Initialize Monaco editor after container is added to DOM
-    setTimeout(() => {
-      this.editor.mount(editorContainer);
-    }, 0);
 
     return container;
   }

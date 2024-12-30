@@ -20,11 +20,8 @@ class ExamController {
     // Create questions
     const questionDocs = await Promise.all(
       questions.map(async (q) => {
-        const QuestionModel = Question.discriminators[q.type];
-        if (!QuestionModel) {
-          throw new ErrorResponse(`Invalid question type: ${q.type}`, 400);
-        }
-        return await QuestionModel.create(q);
+        const question = await Question.create(q);
+        return question;
       })
     );
 
@@ -48,9 +45,9 @@ class ExamController {
     let query;
 
     if (req.user.role === 'teacher') {
-      query = Exam.find({ creator: req.user.userId });
+      query = Exam.find({ creator: req.user.userId }).populate('creator', 'username');
     } else {
-      query = Exam.find({ status: 'published' });
+      query = Exam.find({ status: 'published' }).populate('creator', 'username');
     }
 
     const exams = await query.populate('creator', 'username');
@@ -69,12 +66,12 @@ class ExamController {
     const exam = await Exam.findById(req.params.id).populate('creator', 'username');
 
     if (!exam) {
-      throw new ErrorResponse(`Exam not found with id of ${req.params.id}`, 404);
+      throw new ErrorResponse('Exam not found', 404);
     }
 
     // Check if user has access to unpublished exam
     if (exam.status === 'draft' && exam.creator._id.toString() !== req.user.userId) {
-      throw new ErrorResponse(`Not authorized to access this exam`, 403);
+      throw new ErrorResponse('Not authorized to access this exam', 403);
     }
 
     res.status(200).json({
@@ -90,12 +87,12 @@ class ExamController {
     let exam = await Exam.findById(req.params.id);
 
     if (!exam) {
-      throw new ErrorResponse(`Exam not found with id of ${req.params.id}`, 404);
+      throw new ErrorResponse('Exam not found', 404);
     }
 
     // Make sure user is exam creator
     if (exam.creator.toString() !== req.user.userId) {
-      throw new ErrorResponse(`Not authorized to update this exam`, 403);
+      throw new ErrorResponse('Not authorized to update this exam', 403);
     }
 
     exam = await Exam.findByIdAndUpdate(req.params.id, req.body, {
@@ -116,12 +113,12 @@ class ExamController {
     const exam = await Exam.findById(req.params.id);
 
     if (!exam) {
-      throw new ErrorResponse(`Exam not found with id of ${req.params.id}`, 404);
+      throw new ErrorResponse('Exam not found', 404);
     }
 
     // Make sure user is exam creator
     if (exam.creator.toString() !== req.user.userId) {
-      throw new ErrorResponse(`Not authorized to delete this exam`, 403);
+      throw new ErrorResponse('Not authorized to delete this exam', 403);
     }
 
     // Delete associated questions
@@ -142,20 +139,67 @@ class ExamController {
     const exam = await Exam.findById(req.params.id);
 
     if (!exam) {
-      throw new ErrorResponse(`Exam not found with id of ${req.params.id}`, 404);
+      throw new ErrorResponse('Exam not found', 404);
     }
 
     // Make sure user is exam creator
     if (exam.creator.toString() !== req.user.userId) {
-      throw new ErrorResponse(`Not authorized to publish this exam`, 403);
+      throw new ErrorResponse('Not authorized to publish this exam', 403);
     }
 
+    // Update exam status to published
     exam.status = 'published';
     await exam.save();
 
     res.status(200).json({
       success: true,
       data: exam
+    });
+  });
+
+  // Additional Methods for Stats, Recent Exams, and Submissions
+  getStats = asyncHandler(async (req, res) => {
+    // Implement logic to calculate and return exam stats
+    const totalExams = await Exam.countDocuments();
+    const publishedExams = await Exam.countDocuments({ status: 'published' });
+    const pendingGrading = await Exam.countDocuments({ status: 'pendingGrading' });
+    const totalSubmissions = await Submission.countDocuments();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalExams,
+        publishedExams,
+        pendingGrading,
+        totalSubmissions
+      }
+    });
+  });
+
+  getRecentExams = asyncHandler(async (req, res) => {
+    // Implement logic to fetch recent exams, e.g., last 5 created
+    const recentExams = await Exam.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('creator', 'username');
+
+    res.status(200).json({
+      success: true,
+      data: recentExams
+    });
+  });
+
+  getRecentSubmissions = asyncHandler(async (req, res) => {
+    // Implement logic to fetch recent submissions, e.g., last 5
+    const recentSubmissions = await Submission.find()
+      .sort({ submittedAt: -1 })
+      .limit(5)
+      .populate('exam', 'title')
+      .populate('student', 'username');
+
+    res.status(200).json({
+      success: true,
+      data: recentSubmissions
     });
   });
 }

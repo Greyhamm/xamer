@@ -8,6 +8,9 @@ class ExamState {
     ExamState.instance = this;
     
     this.currentExam = null;
+    this.stats = null;
+    this.recentExams = [];
+    this.recentSubmissions = [];
     this.listeners = new Set();
   }
 
@@ -20,11 +23,33 @@ class ExamState {
   }
 
   notifyListeners() {
-    this.listeners.forEach(callback => callback(this.user));
+    // Pass the entire state or relevant parts
+    const state = {
+      currentExam: this.currentExam,
+      stats: this.stats,
+      recentExams: this.recentExams,
+      recentSubmissions: this.recentSubmissions
+    };
+    this.listeners.forEach(callback => callback(state));
   }
 
   setCurrentExam(exam) {
     this.currentExam = exam;
+    this.notifyListeners();
+  }
+
+  setStats(stats) {
+    this.stats = stats;
+    this.notifyListeners();
+  }
+
+  setRecentExams(exams) {
+    this.recentExams = exams;
+    this.notifyListeners();
+  }
+
+  setRecentSubmissions(submissions) {
+    this.recentSubmissions = submissions;
     this.notifyListeners();
   }
 
@@ -55,6 +80,7 @@ class ExamState {
   async getStats() {
     try {
       const stats = await ExamAPI.getStats();
+      this.setStats(stats);
       return stats;
     } catch (error) {
       console.error('Failed to get stats:', error);
@@ -65,6 +91,7 @@ class ExamState {
   async getRecentExams() {
     try {
       const recentExams = await ExamAPI.getRecentExams();
+      this.setRecentExams(recentExams);
       return recentExams;
     } catch (error) {
       console.error('Failed to get recent exams:', error);
@@ -75,6 +102,7 @@ class ExamState {
   async getRecentSubmissions() {
     try {
       const recentSubmissions = await ExamAPI.getRecentSubmissions();
+      this.setRecentSubmissions(recentSubmissions);
       return recentSubmissions;
     } catch (error) {
       console.error('Failed to get recent submissions:', error);

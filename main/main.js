@@ -41,8 +41,8 @@ const server = expressApp.listen(EXPRESS_PORT, () => {
 // Function to Create the Main Window
 function createWindow() {
   const win = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1200, // Increased width for better UI
+    height: 800, // Increased height for better UI
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'), // Correct path to preload.js
       nodeIntegration: false, // Disabled for security
@@ -102,16 +102,10 @@ app.on('window-all-closed', function () {
 
 ipcMain.handle('create-exam', async (event, examData) => {
   try {
-    // Replace with actual logic to create an exam
-    // Example mock response
-    const newExam = {
-      id: Date.now(),
-      title: examData.title,
-      status: 'draft',
-      questions: examData.questions || [],
-      createdAt: new Date(),
-    };
-    return { success: true, data: newExam };
+    // Replace with actual logic to create an exam, e.g., interacting with the database
+    const ExamController = require('../backend/controllers/ExamController');
+    const response = await ExamController.createExam({ ...examData, user: event.sender.user });
+    return { success: true, data: response };
   } catch (error) {
     console.error('Create exam error:', error);
     return { success: false, message: error.message };
@@ -120,30 +114,19 @@ ipcMain.handle('create-exam', async (event, examData) => {
 
 ipcMain.handle('publish-exam', async (event, examId) => {
   try {
-    // Replace with actual logic to publish an exam
-    // Example mock response
-    const publishedExam = {
-      id: examId,
-      title: `Exam ${examId}`,
-      status: 'published',
-      questions: [],
-      createdAt: new Date(),
-    };
-    return { success: true, data: publishedExam };
+    const ExamController = require('../backend/controllers/ExamController');
+    const response = await ExamController.publishExam(examId, event.sender.user);
+    return { success: true, data: response };
   } catch (error) {
     console.error('Publish exam error:', error);
     return { success: false, message: error.message };
   }
 });
 
-ipcMain.handle('get-exams', async () => {
+ipcMain.handle('get-exams', async (event) => {
   try {
-    // Replace with actual logic to fetch exams
-    // Example mock response
-    const exams = [
-      { id: 1, title: 'Math Exam 1', status: 'published', questions: [], createdAt: new Date() },
-      { id: 2, title: 'Science Exam 1', status: 'draft', questions: [], createdAt: new Date() },
-    ];
+    const ExamController = require('../backend/controllers/ExamController');
+    const exams = await ExamController.getExams(event.sender.user);
     return { success: true, data: exams };
   } catch (error) {
     console.error('Get exams error:', error);
@@ -153,9 +136,8 @@ ipcMain.handle('get-exams', async () => {
 
 ipcMain.handle('get-exam-by-id', async (event, examId) => {
   try {
-    // Replace with actual logic to fetch an exam by ID
-    // Example mock response
-    const exam = { id: examId, title: `Exam ${examId}`, status: 'published', questions: [], createdAt: new Date() };
+    const ExamController = require('../backend/controllers/ExamController');
+    const exam = await ExamController.getExam(examId, event.sender.user);
     return { success: true, data: exam };
   } catch (error) {
     console.error('Get exam by ID error:', error);
@@ -165,10 +147,10 @@ ipcMain.handle('get-exam-by-id', async (event, examId) => {
 
 // Added Handlers
 
-ipcMain.handle('get-exam-stats', async () => {
+ipcMain.handle('get-exam-stats', async (event) => {
   try {
-    // Replace with your actual logic to get exam stats from the database
-    const stats = await getExamStatsFromDatabase();
+    const ExamController = require('../backend/controllers/ExamController');
+    const stats = await ExamController.getStats(event.sender.user);
     return { success: true, data: stats };
   } catch (error) {
     console.error('Error fetching exam stats:', error);
@@ -176,10 +158,10 @@ ipcMain.handle('get-exam-stats', async () => {
   }
 });
 
-ipcMain.handle('get-recent-exams', async () => {
+ipcMain.handle('get-recent-exams', async (event) => {
   try {
-    // Replace with your actual logic to get recent exams from the database
-    const recentExams = await getRecentExamsFromDatabase();
+    const ExamController = require('../backend/controllers/ExamController');
+    const recentExams = await ExamController.getRecentExams(event.sender.user);
     return { success: true, data: recentExams };
   } catch (error) {
     console.error('Error fetching recent exams:', error);
@@ -187,10 +169,10 @@ ipcMain.handle('get-recent-exams', async () => {
   }
 });
 
-ipcMain.handle('get-recent-submissions', async () => {
+ipcMain.handle('get-recent-submissions', async (event) => {
   try {
-    // Replace with your actual logic to get recent submissions from the database
-    const recentSubmissions = await getRecentSubmissionsFromDatabase();
+    const ExamController = require('../backend/controllers/ExamController');
+    const recentSubmissions = await ExamController.getRecentSubmissions(event.sender.user);
     return { success: true, data: recentSubmissions };
   } catch (error) {
     console.error('Error fetching recent submissions:', error);
