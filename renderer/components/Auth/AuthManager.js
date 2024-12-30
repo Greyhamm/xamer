@@ -1,7 +1,7 @@
 // renderer/components/Auth/AuthManager.js
 import LoginForm from './LoginForm.js';
 import SignupForm from './SignupForm.js';
-import DOMHelper from '../../helpers/DOMHelper.js';
+import DOMHelper from '../../services/utils/DOMHelper.js';
 
 export default class AuthManager {
   constructor() {

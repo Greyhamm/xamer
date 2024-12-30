@@ -1,5 +1,5 @@
 // renderer/components/Submissions/SubmissionsView.js
-import DOMHelper from '../../helpers/DOMHelper.js';
+import DOMHelper from '../../services/utils/DOMHelper.js';  
 import GradingView from './GradingView.js';
 export default class SubmissionsView {
   constructor() {
