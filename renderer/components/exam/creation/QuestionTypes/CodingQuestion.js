@@ -13,6 +13,7 @@ export default class CodingQuestion extends BaseQuestion {
     };
     this.editor = null;
     this.editorContainer = null;
+    this.isEditorInitialized = false;
   }
 
   getQuestionData() {
@@ -20,7 +21,7 @@ export default class CodingQuestion extends BaseQuestion {
       type: this.type,
       prompt: this.state.prompt,
       language: this.state.language,
-      initialCode: this.state.initialCode, // Ensure this is captured from editor
+      initialCode: this.editor ? this.editor.getValue() : this.state.initialCode,
       media: this.state.media
     };
   }
@@ -38,32 +39,38 @@ export default class CodingQuestion extends BaseQuestion {
     `;
     languageSelect.value = this.state.language;
     languageSelect.addEventListener('change', (e) => {
-      // Clean up old editor before creating new one
-      if (this.editor) {
-        this.editor.dispose();
-        this.editor = null;
+      const newLanguage = e.target.value;
+      if (newLanguage !== this.state.language) {
+        const currentCode = this.editor ? this.editor.getValue() : '';
+        this.setState({ 
+          language: newLanguage,
+          initialCode: currentCode || this.getDefaultInitialCodeForLanguage(newLanguage)
+        });
+        this.reinitializeEditor();
       }
-      this.setState({ 
-        language: e.target.value,
-        initialCode: this.getDefaultInitialCodeForLanguage(e.target.value)
-      });
-      this.initializeEditor();
     });
 
     container.appendChild(languageSelect);
 
-    // Editor container
+    // Create editor container with explicit dimensions
     this.editorContainer = document.createElement('div');
     this.editorContainer.className = 'monaco-editor-container';
-    this.editorContainer.style.height = '300px';
-    this.editorContainer.style.border = '1px solid #ccc';
-    this.editorContainer.style.marginTop = '1rem';
+    Object.assign(this.editorContainer.style, {
+      height: '300px',
+      width: '100%',
+      border: '1px solid #ccc',
+      marginTop: '1rem',
+      position: 'relative',
+      overflow: 'hidden'
+    });
     container.appendChild(this.editorContainer);
 
     // Initialize editor after container is in DOM
-    requestAnimationFrame(() => {
-      this.initializeEditor();
-    });
+    if (!this.isEditorInitialized) {
+      requestAnimationFrame(() => {
+        this.initializeEditor();
+      });
+    }
 
     return container;
   }
@@ -77,47 +84,40 @@ export default class CodingQuestion extends BaseQuestion {
     return defaults[language] || '';
   }
 
-  initializeEditor() {
-    // Ensure clean slate and prevent memory leaks
+  reinitializeEditor() {
     if (this.editor) {
-      try {
-        this.editor.dispose();
-      } catch (error) {
-        console.warn('Error disposing previous editor:', error);
-      }
+      const currentValue = this.editor.getValue();
+      this.editor.dispose();
       this.editor = null;
+      this.isEditorInitialized = false;
+      // Add a small delay before reinitializing
+      setTimeout(() => {
+        this.initializeEditor(currentValue);
+      }, 50);
     }
-  
-    // Ensure container exists and is clean
-    if (!this.editorContainer) return;
-    this.editorContainer.innerHTML = '';
-  
-    // Create new editor with robust error handling
+  }
+
+  initializeEditor(preservedValue) {
+    if (this.isEditorInitialized || !this.editorContainer) return;
+
     try {
-      this.editor = new MonacoEditor({
-        language: this.state.language,
-        value: this.state.initialCode || this.getDefaultInitialCodeForLanguage(this.state.language),
-        onChange: (value) => {
-          // Update initialCode state when editor content changes
-          requestAnimationFrame(() => {
-            this.setState({ initialCode: value });
-          });
-        },
-        readOnly: false
-      });
-  
-      // Mount with error handling
-      requestAnimationFrame(() => {
-        if (this.editorContainer) {
-          try {
-            this.editor.mount(this.editorContainer);
-          } catch (mountError) {
-            console.error('Error mounting editor:', mountError);
-          }
-        }
-      });
-    } catch (editorError) {
-      console.error('Error creating Monaco Editor:', editorError);
+      if (!this.editor) {
+        this.editor = new MonacoEditor({
+          language: this.state.language,
+          value: preservedValue || this.state.initialCode || this.getDefaultInitialCodeForLanguage(this.state.language),
+          onChange: (value) => {
+            this.state.initialCode = value;
+          },
+          readOnly: false
+        });
+      }
+
+      if (this.editorContainer) {
+        this.editor.mount(this.editorContainer);
+        this.isEditorInitialized = true;
+      }
+    } catch (error) {
+      console.error('Error initializing Monaco Editor:', error);
     }
   }
   
@@ -125,6 +125,7 @@ export default class CodingQuestion extends BaseQuestion {
     if (this.editor) {
       this.editor.dispose();
       this.editor = null;
+      this.isEditorInitialized = false;
     }
   }
 }

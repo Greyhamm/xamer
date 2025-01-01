@@ -20,30 +20,45 @@ export default class ExamCreator {
       Written: WrittenQuestion,
       Coding: CodingQuestion
     };
+
+    this.container = null;
+    this.questionsContainer = null;
+    this.titleInput = null;
   }
 
   setState(newState) {
+    const oldState = { ...this.state };
     this.state = { ...this.state, ...newState };
-    this.updateUI();
+    
+    // Only update what's necessary
+    if (this.state.loading !== oldState.loading) {
+      this.updateLoadingState();
+    }
+    if (this.state.error !== oldState.error) {
+      this.updateErrorState();
+    }
+    // Don't re-render questions unless questions array itself changed
+    if (this.state.questions !== oldState.questions) {
+      this.renderQuestions();
+    }
   }
 
-  updateUI() {
+  updateLoadingState() {
+    if (this.saveButton) {
+      this.saveButton.setDisabled(this.state.loading);
+    }
+    if (this.publishButton) {
+      this.publishButton.setDisabled(this.state.loading);
+    }
+  }
+
+  updateErrorState() {
     if (this.errorElement) {
       this.errorElement.style.display = this.state.error ? 'block' : 'none';
       if (this.state.error) {
         this.errorElement.textContent = this.state.error;
       }
     }
-
-    if (this.saveButton) {
-      this.saveButton.setDisabled(this.state.loading);
-    }
-
-    if (this.publishButton) {
-      this.publishButton.setDisabled(this.state.loading);
-    }
-
-    this.renderQuestions();
   }
 
   addQuestion(type) {
@@ -55,20 +70,63 @@ export default class ExamCreator {
   
     const question = new QuestionClass({
       onDelete: () => this.removeQuestion(question),
-      onChange: () => this.updateUI(),
-      // Explicitly set the type here
+      onChange: () => {
+        // Don't trigger full re-render, just update internal state
+        const questionIndex = this.state.questions.indexOf(question);
+        if (questionIndex !== -1) {
+          this.state.questions[questionIndex] = question;
+        }
+      },
       type: type
     });
   
+    // Update questions array without triggering full re-render
     this.state.questions.push(question);
-    this.updateUI();
+    
+    // Only render the new question
+    this.appendQuestionToContainer(question, this.state.questions.length - 1);
   }
+
   removeQuestion(question) {
     const index = this.state.questions.indexOf(question);
     if (index !== -1) {
+      // Remove the question's DOM element
+      const questionWrapper = this.questionsContainer.children[index];
+      if (questionWrapper) {
+        question.dispose(); // Clean up the question (especially important for coding editors)
+        questionWrapper.remove();
+      }
+      
+      // Update state without triggering re-render
       this.state.questions.splice(index, 1);
-      this.updateUI();
+      
+      // Update remaining question numbers
+      this.updateQuestionNumbers();
     }
+  }
+
+  updateQuestionNumbers() {
+    Array.from(this.questionsContainer.children).forEach((wrapper, index) => {
+      const numberLabel = wrapper.querySelector('.question-number');
+      if (numberLabel) {
+        numberLabel.textContent = `Question ${index + 1}`;
+      }
+    });
+  }
+
+  appendQuestionToContainer(question, index) {
+    if (!this.questionsContainer) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'question-wrapper';
+    
+    const numberLabel = document.createElement('div');
+    numberLabel.className = 'question-number';
+    numberLabel.textContent = `Question ${index + 1}`;
+    
+    wrapper.appendChild(numberLabel);
+    wrapper.appendChild(question.render());
+    this.questionsContainer.appendChild(wrapper);
   }
 
   async saveExam(publish = false) {
@@ -81,26 +139,19 @@ export default class ExamCreator {
         status: publish ? 'published' : 'draft'
       };
   
-      // Validate exam data
       const errors = ValidationService.validateExam(examData);
       if (errors.length > 0) {
         throw new Error(errors.join('\n'));
       }
   
-      console.log('Saving exam with data:', examData);
       const savedExam = await ExamState.saveExam(examData);
   
-      // Only publish if requested and exam was saved successfully
       if (publish && savedExam) {
         await ExamState.publishExam(savedExam._id);
       }
   
-      // Clear form
-      this.setState({
-        title: '',
-        questions: [],
-        loading: false
-      });
+      // Clear form without re-rendering
+      this.clearForm();
   
       alert(`Exam ${publish ? 'published' : 'saved'} successfully!`);
     } catch (error) {
@@ -111,10 +162,31 @@ export default class ExamCreator {
       });
     }
   }
-  
+
+  clearForm() {
+    // Clean up existing questions
+    this.state.questions.forEach(question => question.dispose());
+    
+    // Reset state
+    this.state = {
+      title: '',
+      questions: [],
+      loading: false,
+      error: null
+    };
+
+    // Update UI without full re-render
+    if (this.titleInput) {
+      this.titleInput.setValue('');
+    }
+    if (this.questionsContainer) {
+      this.questionsContainer.innerHTML = '';
+    }
+  }
+
   render() {
-    const container = document.createElement('div');
-    container.className = 'exam-creator-container';
+    this.container = document.createElement('div');
+    this.container.className = 'exam-creator-container';
 
     // Header
     const header = document.createElement('h2');
@@ -127,10 +199,12 @@ export default class ExamCreator {
     this.errorElement.style.display = 'none';
 
     // Title input
-    const titleInput = new Input({
+    this.titleInput = new Input({
       placeholder: 'Enter exam title...',
       value: this.state.title,
-      onChange: (value) => this.setState({ title: value })
+      onChange: (value) => {
+        this.state.title = value; // Update state without re-render
+      }
     });
 
     // Add question buttons
@@ -170,31 +244,13 @@ export default class ExamCreator {
     saveButtonsContainer.appendChild(this.publishButton.render());
 
     // Assemble container
-    container.appendChild(header);
-    container.appendChild(this.errorElement);
-    container.appendChild(titleInput.render());
-    container.appendChild(buttonGroup);
-    container.appendChild(this.questionsContainer);
-    container.appendChild(saveButtonsContainer);
+    this.container.appendChild(header);
+    this.container.appendChild(this.errorElement);
+    this.container.appendChild(this.titleInput.render());
+    this.container.appendChild(buttonGroup);
+    this.container.appendChild(this.questionsContainer);
+    this.container.appendChild(saveButtonsContainer);
 
-    return container;
-  }
-
-  renderQuestions() {
-    if (!this.questionsContainer) return;
-
-    this.questionsContainer.innerHTML = '';
-    this.state.questions.forEach((question, index) => {
-      const wrapper = document.createElement('div');
-      wrapper.className = 'question-wrapper';
-      
-      const numberLabel = document.createElement('div');
-      numberLabel.className = 'question-number';
-      numberLabel.textContent = `Question ${index + 1}`;
-      
-      wrapper.appendChild(numberLabel);
-      wrapper.appendChild(question.render());
-      this.questionsContainer.appendChild(wrapper);
-    });
+    return this.container;
   }
 }

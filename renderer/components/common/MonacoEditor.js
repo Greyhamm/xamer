@@ -7,9 +7,10 @@ export default class MonacoEditor {
     this.editor = null;
     this.container = null;
     this.changeTimeout = null;
+    this.layoutTimeout = null;
+    this.resizeObserver = null;
   }
 
-  // Debounced onChange to prevent excessive calls
   debouncedOnChange(value) {
     if (this.changeTimeout) {
       clearTimeout(this.changeTimeout);
@@ -19,11 +20,10 @@ export default class MonacoEditor {
       if (this.options.onChange) {
         this.options.onChange(value);
       }
-    }, 300); // Adjust delay as needed
+    }, 300);
   }
 
   mount(container) {
-    // Extensive error checking
     if (!window.monaco) {
       console.error('Monaco Editor not loaded');
       return;
@@ -33,43 +33,24 @@ export default class MonacoEditor {
       console.error('Invalid container element');
       return;
     }
-  
-    // Comprehensive cleanup
-    try {
-      if (this.editor) {
-        this.editor.dispose();
-      }
-    } catch (disposeError) {
-      console.warn('Error disposing previous editor:', disposeError);
-    }
-  
-    // Reset container
-    this.container = container;
-    this.container.innerHTML = '';
-  
-    // Define theme directly
-    monaco.editor.defineTheme('examTheme', {
-      base: 'vs-dark',
-      inherit: true,
-      rules: [],
-      colors: {
-        'editor.background': '#1e1e1e',
-        'editor.foreground': '#d4d4d4',
-        'editor.lineHighlightBackground': '#2d2d2d',
-        'editorCursor.foreground': '#ffffff',
-        'editor.selectionBackground': '#264f78'
-      }
-    });
 
-    // Set the theme
-    monaco.editor.setTheme('examTheme');
+    // Store container reference
+    this.container = container;
+    
+    // Only dispose if we have an existing editor
+    if (this.editor) {
+      this.editor.dispose();
+    }
+
+    // Reset container
+    this.container.innerHTML = '';
 
     // Create editor with specific configuration
     this.editor = monaco.editor.create(this.container, {
       value: this.options.value || '',
       language: this.options.language || 'javascript',
-      theme: 'examTheme',
-      automaticLayout: true,
+      theme: 'vs-dark',
+      automaticLayout: false, // Changed to false as we'll handle layout
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
       lineNumbers: 'on',
@@ -87,17 +68,39 @@ export default class MonacoEditor {
       hideCursorInOverviewRuler: true
     });
 
-    // Add change listener with debounce
+    // Setup resize handling
+    this.setupResizeHandling();
+
+    // Add change listener
     this.editor.onDidChangeModelContent(() => {
       const value = this.editor.getValue();
       this.debouncedOnChange(value);
     });
 
-    // Setup resize handling
-    this.setupResizeHandling();
+    // Force initial layout
+    this.updateLayout();
   }
 
-  updateLayout = () => {
+  setupResizeHandling() {
+    // Clean up existing observer
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+
+    // Create new observer
+    this.resizeObserver = new ResizeObserver(() => {
+      this.updateLayout();
+    });
+
+    if (this.container) {
+      this.resizeObserver.observe(this.container);
+    }
+
+    // Also watch for window resize
+    window.addEventListener('resize', this.updateLayout.bind(this));
+  }
+
+  updateLayout() {
     if (!this.editor || !this.container) return;
 
     // Clear any pending layout timeout
@@ -108,25 +111,18 @@ export default class MonacoEditor {
     // Schedule a new layout update
     this.layoutTimeout = setTimeout(() => {
       if (this.editor) {
+        // Ensure container has dimensions
+        if (this.container.clientHeight === 0) {
+          this.container.style.height = '300px';
+        }
+        
+        // Force editor layout update
         this.editor.layout();
+
+        // Force Monaco to refresh its viewport
+        this.editor.render(true);
       }
     }, 10);
-  }
-
-  setupResizeHandling() {
-    if (this.resizeObserver) {
-      this.resizeObserver.disconnect();
-    }
-
-    this.resizeObserver = new ResizeObserver(() => {
-      this.updateLayout();
-    });
-
-    if (this.container) {
-      this.resizeObserver.observe(this.container);
-    }
-
-    window.addEventListener('resize', this.updateLayout);
   }
 
   getValue() {
@@ -141,7 +137,7 @@ export default class MonacoEditor {
   }
 
   dispose() {
-    window.removeEventListener('resize', this.updateLayout);
+    window.removeEventListener('resize', this.updateLayout.bind(this));
 
     if (this.layoutTimeout) {
       clearTimeout(this.layoutTimeout);
