@@ -1,6 +1,5 @@
 import BaseQuestion from './BaseQuestion.js';
 import MonacoEditor from '../../../common/MonacoEditor.js';
-import Button from '../../../common/Button.js';
 
 export default class CodingQuestion extends BaseQuestion {
   constructor(options = {}) {
@@ -11,28 +10,18 @@ export default class CodingQuestion extends BaseQuestion {
       language: options.language || 'javascript',
       initialCode: options.initialCode || '',
       testCases: options.testCases || [],
-      executionResult: null
     };
     this.editor = null;
     this.editorContainer = null;
   }
 
-  async executeCode() {
-    try {
-      const code = this.editor.getValue();
-      const response = await window.api[`execute${this.state.language}`](code);
-      this.setState({ executionResult: response });
-    } catch (error) {
-      this.setState({ error: error.message });
-    }
-  }
-
   getQuestionData() {
     return {
-      type: this.type, // Ensure type is set
+      type: this.type,
       prompt: this.state.prompt,
       language: this.state.language,
-      initialCode: this.state.initialCode
+      initialCode: this.state.initialCode, // Ensure this is captured from editor
+      media: this.state.media
     };
   }
 
@@ -54,7 +43,10 @@ export default class CodingQuestion extends BaseQuestion {
         this.editor.dispose();
         this.editor = null;
       }
-      this.setState({ language: e.target.value });
+      this.setState({ 
+        language: e.target.value,
+        initialCode: this.getDefaultInitialCodeForLanguage(e.target.value)
+      });
       this.initializeEditor();
     });
 
@@ -68,28 +60,21 @@ export default class CodingQuestion extends BaseQuestion {
     this.editorContainer.style.marginTop = '1rem';
     container.appendChild(this.editorContainer);
 
-    // Execute button
-    const executeButton = new Button({
-      text: 'Run Code',
-      className: 'btn-primary',
-      onClick: () => this.executeCode()
-    });
-    container.appendChild(executeButton.render());
-
-    // Output container
-    const outputContainer = document.createElement('pre');
-    outputContainer.className = 'code-output';
-    if (this.state.executionResult) {
-      outputContainer.textContent = JSON.stringify(this.state.executionResult, null, 2);
-    }
-    container.appendChild(outputContainer);
-
     // Initialize editor after container is in DOM
     requestAnimationFrame(() => {
       this.initializeEditor();
     });
 
     return container;
+  }
+
+  getDefaultInitialCodeForLanguage(language) {
+    const defaults = {
+      'javascript': '// Write your JavaScript code here\n',
+      'python': '# Write your Python code here\n',
+      'java': '// Write your Java code here\n'
+    };
+    return defaults[language] || '';
   }
 
   initializeEditor() {
@@ -111,9 +96,9 @@ export default class CodingQuestion extends BaseQuestion {
     try {
       this.editor = new MonacoEditor({
         language: this.state.language,
-        value: this.state.initialCode || '',
+        value: this.state.initialCode || this.getDefaultInitialCodeForLanguage(this.state.language),
         onChange: (value) => {
-          // Use requestAnimationFrame to ensure state update is async
+          // Update initialCode state when editor content changes
           requestAnimationFrame(() => {
             this.setState({ initialCode: value });
           });
@@ -135,7 +120,6 @@ export default class CodingQuestion extends BaseQuestion {
       console.error('Error creating Monaco Editor:', editorError);
     }
   }
-  
   
   dispose() {
     if (this.editor) {
