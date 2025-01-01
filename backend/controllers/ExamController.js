@@ -1,23 +1,23 @@
 const Exam = require('../models/Exam');
+const ExamSubmission = require('../models/ExamSubmission');
 const Question = require('../models/base/BaseQuestion');
 const ValidationService = require('../services/ValidationService');
 const ErrorResponse = require('../utils/errorResponse');
-const asyncHandler = require('../utils/asyncHandler');
 
 class ExamController {
-  // @desc    Create new exam
-  // @route   POST /api/exams
-  // @access  Private/Teacher
-  createExam = asyncHandler(async (req, res) => {
+  // Create new exam
+  createExam = async (req) => {
     const { title, questions } = req.body;
 
-    // Validate exam
+    if (!title || !questions) {
+      throw new ErrorResponse('Title and questions are required', 400);
+    }
+
     const validationErrors = ValidationService.validateExam({ title, questions });
     if (validationErrors.length > 0) {
       throw new ErrorResponse(validationErrors.join(', '), 400);
     }
 
-    // Create questions
     const questionDocs = await Promise.all(
       questions.map(async (q) => {
         const question = await Question.create(q);
@@ -25,72 +25,54 @@ class ExamController {
       })
     );
 
-    // Create exam
     const exam = await Exam.create({
       title,
       creator: req.user.userId,
       questions: questionDocs.map(q => q._id)
     });
 
-    res.status(201).json({
-      success: true,
-      data: exam
-    });
-  });
+    return exam;
+  };
 
-  // @desc    Get all exams
-  // @route   GET /api/exams
-  // @access  Private
-  getExams = asyncHandler(async (req, res) => {
+  // Get all exams
+  getExams = async (req) => {
     let query;
 
     if (req.user.role === 'teacher') {
-      query = Exam.find({ creator: req.user.userId }).populate('creator', 'username');
+      query = Exam.find({ creator: req.user.userId });
     } else {
-      query = Exam.find({ status: 'published' }).populate('creator', 'username');
+      query = Exam.find({ status: 'published' });
     }
 
     const exams = await query.populate('creator', 'username');
+    return exams;
+  };
 
-    res.status(200).json({
-      success: true,
-      count: exams.length,
-      data: exams
-    });
-  });
-
-  // @desc    Get single exam
-  // @route   GET /api/exams/:id
-  // @access  Private
-  getExam = asyncHandler(async (req, res) => {
-    const exam = await Exam.findById(req.params.id).populate('creator', 'username');
+  // Get single exam
+  getExam = async (req) => {
+    const exam = await Exam.findById(req.params.id)
+      .populate('creator', 'username')
+      .populate('questions');
 
     if (!exam) {
       throw new ErrorResponse('Exam not found', 404);
     }
 
-    // Check if user has access to unpublished exam
     if (exam.status === 'draft' && exam.creator._id.toString() !== req.user.userId) {
       throw new ErrorResponse('Not authorized to access this exam', 403);
     }
 
-    res.status(200).json({
-      success: true,
-      data: exam
-    });
-  });
+    return exam;
+  };
 
-  // @desc    Update exam
-  // @route   PUT /api/exams/:id
-  // @access  Private/Teacher
-  updateExam = asyncHandler(async (req, res) => {
+  // Update exam
+  updateExam = async (req) => {
     let exam = await Exam.findById(req.params.id);
 
     if (!exam) {
       throw new ErrorResponse('Exam not found', 404);
     }
 
-    // Make sure user is exam creator
     if (exam.creator.toString() !== req.user.userId) {
       throw new ErrorResponse('Not authorized to update this exam', 403);
     }
@@ -100,108 +82,172 @@ class ExamController {
       runValidators: true
     });
 
-    res.status(200).json({
-      success: true,
-      data: exam
-    });
-  });
+    return exam;
+  };
 
-  // @desc    Delete exam
-  // @route   DELETE /api/exams/:id
-  // @access  Private/Teacher
-  deleteExam = asyncHandler(async (req, res) => {
+  // Delete exam
+  deleteExam = async (req) => {
     const exam = await Exam.findById(req.params.id);
 
     if (!exam) {
       throw new ErrorResponse('Exam not found', 404);
     }
 
-    // Make sure user is exam creator
     if (exam.creator.toString() !== req.user.userId) {
       throw new ErrorResponse('Not authorized to delete this exam', 403);
     }
 
-    // Delete associated questions
     await Question.deleteMany({ _id: { $in: exam.questions } });
-
     await exam.remove();
 
-    res.status(200).json({
-      success: true,
-      data: {}
-    });
-  });
+    return { success: true };
+  };
 
-  // @desc    Publish exam
-  // @route   PUT /api/exams/:id/publish
-  // @access  Private/Teacher
-  publishExam = asyncHandler(async (req, res) => {
+  // Publish exam
+  publishExam = async (req) => {
     const exam = await Exam.findById(req.params.id);
 
     if (!exam) {
       throw new ErrorResponse('Exam not found', 404);
     }
 
-    // Make sure user is exam creator
     if (exam.creator.toString() !== req.user.userId) {
       throw new ErrorResponse('Not authorized to publish this exam', 403);
     }
 
-    // Update exam status to published
     exam.status = 'published';
     await exam.save();
 
-    res.status(200).json({
-      success: true,
-      data: exam
-    });
-  });
+    return exam;
+  };
 
-  // Additional Methods for Stats, Recent Exams, and Submissions
-  getStats = asyncHandler(async (req, res) => {
-    // Implement logic to calculate and return exam stats
-    const totalExams = await Exam.countDocuments();
-    const publishedExams = await Exam.countDocuments({ status: 'published' });
-    const pendingGrading = await Exam.countDocuments({ status: 'pendingGrading' });
-    const totalSubmissions = await Submission.countDocuments();
+  // Get exam statistics
+  getStats = async (req) => {
+    try {
+      const [totalExams, publishedExams, pendingGrading, totalSubmissions] = await Promise.all([
+        Exam.countDocuments({ creator: req.user.userId }),
+        Exam.countDocuments({ creator: req.user.userId, status: 'published' }),
+        ExamSubmission.countDocuments({ status: 'submitted' }),
+        ExamSubmission.countDocuments()
+      ]);
 
-    res.status(200).json({
-      success: true,
-      data: {
+      return {
         totalExams,
         publishedExams,
         pendingGrading,
         totalSubmissions
+      };
+    } catch (error) {
+      console.error('Error getting stats:', error);
+      throw new ErrorResponse('Failed to fetch exam statistics', 500);
+    }
+  };
+
+  // Get recent exams
+  getRecentExams = async (req) => {
+    try {
+      const recentExams = await Exam.find({ creator: req.user.userId })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .populate('creator', 'username')
+        .populate('questions');
+
+      return recentExams;
+    } catch (error) {
+      console.error('Error getting recent exams:', error);
+      throw new ErrorResponse('Failed to fetch recent exams', 500);
+    }
+  };
+
+  // Get recent submissions
+  getRecentSubmissions = async (req) => {
+    try {
+      const recentSubmissions = await ExamSubmission.find()
+        .sort({ submittedAt: -1 })
+        .limit(5)
+        .populate('exam', 'title')
+        .populate('student', 'username');
+
+      return recentSubmissions;
+    } catch (error) {
+      console.error('Error getting recent submissions:', error);
+      throw new ErrorResponse('Failed to fetch recent submissions', 500);
+    }
+  };
+
+  // Submit exam
+  submitExam = async (req) => {
+    const { examId, answers } = req.body;
+
+    const exam = await Exam.findOne({
+      _id: examId,
+      status: 'published'
+    });
+
+    if (!exam) {
+      throw new ErrorResponse('Exam not found or not published', 404);
+    }
+
+    const existingSubmission = await ExamSubmission.findOne({
+      exam: examId,
+      student: req.user.userId
+    });
+
+    if (existingSubmission) {
+      throw new ErrorResponse('You have already submitted this exam', 400);
+    }
+
+    if (!Array.isArray(answers)) {
+      throw new ErrorResponse('Invalid answers format', 400);
+    }
+
+    const submission = await ExamSubmission.create({
+      exam: examId,
+      student: req.user.userId,
+      answers: answers.map(answer => ({
+        question: answer.questionId,
+        answer: answer.answer,
+        timeSpent: answer.timeSpent
+      })),
+      status: 'submitted',
+      submitTime: Date.now()
+    });
+
+    return submission;
+  };
+
+  // Grade submission
+  gradeSubmission = async (req) => {
+    const submission = await ExamSubmission.findById(req.params.id)
+      .populate('exam');
+
+    if (!submission) {
+      throw new ErrorResponse('Submission not found', 404);
+    }
+
+    if (submission.exam.creator.toString() !== req.user.userId) {
+      throw new ErrorResponse('Not authorized to grade this submission', 403);
+    }
+
+    submission.answers = submission.answers.map(answer => {
+      const grade = req.body.grades.find(g => g.questionId === answer.question.toString());
+      if (grade) {
+        answer.score = grade.score;
+        answer.feedback = grade.feedback;
       }
+      return answer;
     });
-  });
 
-  getRecentExams = asyncHandler(async (req, res) => {
-    // Implement logic to fetch recent exams, e.g., last 5 created
-    const recentExams = await Exam.find()
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .populate('creator', 'username');
+    submission.status = 'graded';
+    submission.gradedBy = req.user.userId;
+    submission.gradedAt = Date.now();
 
-    res.status(200).json({
-      success: true,
-      data: recentExams
-    });
-  });
+    await submission.save();
 
-  getRecentSubmissions = asyncHandler(async (req, res) => {
-    // Implement logic to fetch recent submissions, e.g., last 5
-    const recentSubmissions = await Submission.find()
-      .sort({ submittedAt: -1 })
-      .limit(5)
-      .populate('exam', 'title')
-      .populate('student', 'username');
-
-    res.status(200).json({
-      success: true,
-      data: recentSubmissions
-    });
-  });
+    return submission;
+  };
 }
 
-module.exports = new ExamController();
+module.exports = {
+  ExamController
+};
