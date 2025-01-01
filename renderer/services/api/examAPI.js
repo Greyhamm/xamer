@@ -22,7 +22,7 @@ class ExamAPI {
             if (!response.success) {
                 throw new Error(response.error || 'Failed to publish exam');
             }
-            return response.data;
+            return response;  // Return full response object
         } catch (error) {
             console.error('Publish exam error:', error);
             throw error;

@@ -48,8 +48,19 @@ class ExamState {
     async publishExam(examId) {
         try {
             const response = await ExamAPI.publishExam(examId);
-            this.setCurrentExam(response);
-            return response;
+            if (!response.success) {
+                throw new Error(response.error || 'Failed to publish exam');
+            }
+            // Update current exam if it matches the published exam
+            if (this.currentExam && this.currentExam._id === examId) {
+                this.setCurrentExam({
+                    ...this.currentExam,
+                    status: 'published'
+                });
+            }
+            // Refresh recent exams
+            await this.getRecentExams();
+            return response.data;
         } catch (error) {
             console.error('Publish exam error:', error);
             throw error;

@@ -131,13 +131,13 @@ class PreloadBridge {
 
       publishExam: async (examId) => {
         if (!this.userData) {
-          throw new Error('User not authenticated');
+            throw new Error('User not authenticated');
         }
         return await ipcRenderer.invoke('publish-exam', {
-          examId,
-          userData: this.userData
+            examId,
+            userData: this.userData
         });
-      }
+      },
     });
   }
 }

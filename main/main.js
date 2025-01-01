@@ -94,36 +94,32 @@ app.on('window-all-closed', function () {
 });
 
 // IPC Handlers
-// IPC Handlers
 ipcMain.handle('create-exam', ipcAsyncHandler(async (event, data) => {
   console.log('Create exam data received:', data);
   
   if (!data.userData || !data.userData.userId) {
-    throw new Error('User not authenticated');
+      throw new Error('User not authenticated');
   }
 
   try {
-    const result = await examController.createExam({
-      body: {
-        ...data,
-        creator: data.userData.userId
-      },
-      user: {
-        userId: data.userData.userId,
-        role: data.userData.role
-      }
-    });
+      const result = await examController.createExam({
+          body: {
+              title: data.title,
+              questions: data.questions,
+              status: data.status,
+              userData: data.userData
+          },
+          user: {
+              userId: data.userData.userId,
+              role: data.userData.role
+          }
+      });
 
-    return {
-      success: true,
-      data: result
-    };
+      // Ensure the result is serializable
+      return JSON.parse(JSON.stringify(result));
   } catch (error) {
-    console.error('Create exam error:', error);
-    return {
-      success: false,
-      error: error.message
-    };
+      console.error('Create exam error:', error);
+      throw error;
   }
 }));
 
@@ -140,33 +136,27 @@ ipcMain.handle('get-exam-stats', ipcAsyncHandler(async (event, data) => {
   });
 }));
 
-ipcMain.handle('publish-exam', ipcAsyncHandler(async (event, examId) => {
-  console.log('Publishing exam:', examId);
-  const user = await getUserFromEvent(event);
+// Update this section in main.js
+ipcMain.handle('publish-exam', ipcAsyncHandler(async (event, data) => {
+  console.log('Publishing exam:', data);
   
-  if (!user || !user.userId) {
+  if (!data.userData || !data.userData.userId) {
       throw new Error('User not authenticated');
   }
 
   try {
       const result = await examController.publishExam({
-          params: { id: examId },
+          params: { id: data.examId },
           user: {
-              userId: user.userId,
-              role: user.role
+              userId: data.userData.userId,
+              role: data.userData.role
           }
       });
 
-      return {
-          success: true,
-          data: result
-      };
+      return JSON.parse(JSON.stringify(result));
   } catch (error) {
       console.error('Publish exam error:', error);
-      return {
-          success: false,
-          error: error.message
-      };
+      throw error;
   }
 }));
 
