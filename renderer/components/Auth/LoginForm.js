@@ -1,7 +1,7 @@
 import Button from '../common/Button.js';
 import Input from '../common/Input.js';
 import UserState from '../../services/state/UserState.js';
-import AppState from '../../services/state/AppState.js'; // Added import
+import AppState from '../../services/state/AppState.js';
 
 export default class LoginForm {
   constructor(onSwitchToSignup) {
@@ -12,8 +12,8 @@ export default class LoginForm {
       error: null
     };
     this.onSwitchToSignup = onSwitchToSignup;
-
-    // Bind methods if necessary
+    
+    // Bind methods
     this.handleSubmit = this.handleSubmit.bind(this);
   }
 
@@ -22,22 +22,43 @@ export default class LoginForm {
     if (this.state.loading) return;
 
     this.setState({ loading: true, error: null });
+    this.submitButton.setLoading(true);
 
     try {
-      const result = await UserState.login({
+      // Attempt login
+      const response = await UserState.login({
         email: this.state.email,
         password: this.state.password
       });
 
-      if (result.role === 'teacher') {
+      console.log('Login response:', response);
+
+      if (!response.success) {
+        throw new Error(response.message || 'Login failed');
+      }
+
+      // Set user data
+      UserState.setUser({
+        userId: response.userId,
+        role: response.role,
+        username: response.username
+      });
+
+      // Navigate based on role
+      console.log('Navigating user with role:', response.role);
+      if (response.role === 'teacher') {
         AppState.navigateTo('teacherDashboard');
-      } else if (result.role === 'student') {
+      } else if (response.role === 'student') {
         AppState.navigateTo('studentDashboard');
       } else {
-        this.setState({ error: 'Unknown user role' });
+        throw new Error('Invalid user role');
       }
+
     } catch (error) {
-      this.setState({ error: error.message });
+      console.error('Login error:', error);
+      this.setState({ 
+        error: error.message || 'Login failed - please try again' 
+      });
     } finally {
       this.setState({ loading: false });
       this.submitButton.setLoading(false);
