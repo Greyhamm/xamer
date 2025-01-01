@@ -94,27 +94,95 @@ app.on('window-all-closed', function () {
 });
 
 // IPC Handlers
-ipcMain.handle('create-exam', ipcAsyncHandler(async (event, examData) => {
-  console.log('Creating exam with data:', examData);
-  return await examController.createExam({
-    body: examData,
+// IPC Handlers
+ipcMain.handle('create-exam', ipcAsyncHandler(async (event, data) => {
+  console.log('Create exam data received:', data);
+  
+  if (!data.userData || !data.userData.userId) {
+    throw new Error('User not authenticated');
+  }
+
+  try {
+    const result = await examController.createExam({
+      body: {
+        ...data,
+        creator: data.userData.userId
+      },
+      user: {
+        userId: data.userData.userId,
+        role: data.userData.role
+      }
+    });
+
+    return {
+      success: true,
+      data: result
+    };
+  } catch (error) {
+    console.error('Create exam error:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}));
+
+ipcMain.handle('get-exam-stats', ipcAsyncHandler(async (event, data) => {
+  if (!data.userData || !data.userData.userId) {
+    throw new Error('User not authenticated');
+  }
+
+  return await examController.getStats({
     user: {
-      userId: event.sender.userId,
-      role: event.sender.role
+      userId: data.userData.userId,
+      role: data.userData.role
     }
   });
 }));
 
 ipcMain.handle('publish-exam', ipcAsyncHandler(async (event, examId) => {
   console.log('Publishing exam:', examId);
-  return await examController.publishExam({
-    params: { id: examId },
-    user: {
-      userId: event.sender.userId,
-      role: event.sender.role
-    }
-  });
+  const user = await getUserFromEvent(event);
+  
+  if (!user || !user.userId) {
+      throw new Error('User not authenticated');
+  }
+
+  try {
+      const result = await examController.publishExam({
+          params: { id: examId },
+          user: {
+              userId: user.userId,
+              role: user.role
+          }
+      });
+
+      return {
+          success: true,
+          data: result
+      };
+  } catch (error) {
+      console.error('Publish exam error:', error);
+      return {
+          success: false,
+          error: error.message
+      };
+  }
 }));
+
+// Helper function to get user info
+async function getUserFromEvent(event) {
+  // Get the stored user data from the sender
+  const userId = event.sender.userId;
+  const role = event.sender.role;
+  
+  if (!userId) {
+      console.error('No user ID found in event sender');
+      return null;
+  }
+
+  return { userId, role };
+}
 
 ipcMain.handle('get-exams', ipcAsyncHandler(async (event) => {
   console.log('Fetching exams for user:', event.sender.userId);
@@ -137,15 +205,7 @@ ipcMain.handle('get-exam-by-id', ipcAsyncHandler(async (event, examId) => {
   });
 }));
 
-ipcMain.handle('get-exam-stats', ipcAsyncHandler(async (event) => {
-  console.log('Fetching exam stats for user:', event.sender.userId);
-  return await examController.getStats({
-    user: {
-      userId: event.sender.userId,
-      role: event.sender.role
-    }
-  });
-}));
+
 
 ipcMain.handle('get-recent-exams', ipcAsyncHandler(async (event) => {
   console.log('Fetching recent exams for user:', event.sender.userId);
@@ -157,15 +217,6 @@ ipcMain.handle('get-recent-exams', ipcAsyncHandler(async (event) => {
   });
 }));
 
-ipcMain.handle('get-recent-submissions', ipcAsyncHandler(async (event) => {
-  console.log('Fetching recent submissions for user:', event.sender.userId);
-  return await examController.getRecentSubmissions({
-    user: {
-      userId: event.sender.userId,
-      role: event.sender.role
-    }
-  });
-}));
 
 // Handle exam submissions
 ipcMain.handle('submit-exam', ipcAsyncHandler(async (event, { examId, answers }) => {

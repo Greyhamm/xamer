@@ -2,16 +2,69 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 class PreloadBridge {
   constructor() {
-    // Initialize any necessary properties
+    this.userData = this.loadUserData();
+  }
+
+  loadUserData() {
+    try {
+      const token = localStorage.getItem('token');
+      const userId = localStorage.getItem('userId');
+      const role = localStorage.getItem('role');
+      
+      if (token && userId && role) {
+        const userData = { userId, role };
+        console.log('Loaded user data:', userData);
+        return userData;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error loading user data:', error);
+      return null;
+    }
+  }
+
+  saveUserData(responseData) {
+    try {
+      if (responseData.token) {
+        localStorage.setItem('token', responseData.token);
+        localStorage.setItem('userId', responseData.userId);
+        localStorage.setItem('role', responseData.role);
+        this.userData = {
+          userId: responseData.userId,
+          role: responseData.role
+        };
+        console.log('Saved user data:', this.userData);
+      }
+    } catch (error) {
+      console.error('Error saving user data:', error);
+    }
   }
 
   // Helper to get auth header
   getAuthHeader() {
-    const token = localStorage.getItem('token'); // Example token retrieval
+    const token = localStorage.getItem('token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   }
 
-  // Generic fetch wrapper
+  async login(options) {
+    try {
+      const response = await this.fetchApi({
+        endpoint: '/auth/login',
+        data: options.data,
+        method: 'POST',
+        headers: options.headers
+      });
+
+      if (response.success) {
+        this.saveUserData(response);
+      }
+      return response;
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
+  }
+
   async fetchApi({ endpoint, data = {}, method = 'POST', headers = {} } = {}) {
     const defaultHeaders = {
       'Content-Type': 'application/json',
@@ -26,65 +79,64 @@ class PreloadBridge {
         body: method !== 'GET' ? JSON.stringify(data) : undefined
       });
 
-      // Check if response is OK
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'API request failed');
       }
 
-      const responseData = await response.json(); // Parse JSON here
-
-      return responseData; // Return parsed data
+      return await response.json();
     } catch (error) {
       console.error(`Fetch API Error at ${endpoint}:`, error);
       throw error;
     }
   }
 
-  // Expose API methods to renderer
   exposeApi() {
     contextBridge.exposeInMainWorld('api', {
-      signup: (options) => this.fetchApi({ endpoint: options.endpoint, data: options.data, method: 'POST', headers: options.headers }),
-      login: (options) => this.fetchApi({ endpoint: options.endpoint, data: options.data, method: 'POST', headers: options.headers }),
+      signup: (options) => this.fetchApi({ ...options }),
+      login: (options) => this.login(options),
       getProfile: () => this.fetchApi({ endpoint: '/auth/profile', method: 'GET' }),
 
-      createExam: (examData) => ipcRenderer.invoke('create-exam', examData),
-      publishExam: (examId) => ipcRenderer.invoke('publish-exam', examId),
-      getExams: () => ipcRenderer.invoke('get-exams'),
-      getExamById: (examId) => ipcRenderer.invoke('get-exam-by-id', examId),
-
-      // Added Methods
-      getExamStats: () => ipcRenderer.invoke('get-exam-stats'),
-      getRecentExams: () => ipcRenderer.invoke('get-recent-exams'),
-      getRecentSubmissions: () => ipcRenderer.invoke('get-recent-submissions'),
-
-      submitExam: (examId, answers) => this.fetchApi({ endpoint: `/exams/${examId}/submit`, data: { answers }, method: 'POST' }),
-
-      getSubmissions: () => this.fetchApi({ endpoint: '/submissions', method: 'GET' }),
-
-      gradeSubmission: (submissionId, grades) => this.fetchApi({ endpoint: `/submissions/${submissionId}/grade`, data: { grades }, method: 'POST' }),
-
-      executeJavaScript: (code) => this.fetchApi({ endpoint: '/execute/javascript', data: { code }, method: 'POST' }),
-
-      executePython: (code) => this.fetchApi({ endpoint: '/execute/python', data: { code }, method: 'POST' }),
-
-      executeJava: (code) => this.fetchApi({ endpoint: '/execute/java', data: { code }, method: 'POST' }),
-
-      uploadMedia: async (file) => {
-        const formData = new FormData();
-        formData.append('media', file);
-
-        const response = await fetch(`http://localhost:3000/api/media/upload`, {
-          method: 'POST',
-          headers: this.getAuthHeader(),
-          body: formData
-        });
-
-        if (!response.ok) {
-          throw new Error('Upload failed');
+      createExam: async (examData) => {
+        console.log('Creating exam, user data:', this.userData);
+        if (!this.userData) {
+          throw new Error('User not authenticated');
         }
+        return await ipcRenderer.invoke('create-exam', {
+          ...examData,
+          userData: this.userData
+        });
+      },
 
-        return response.json();
+      getExamStats: async () => {
+        if (!this.userData) {
+          throw new Error('User not authenticated');
+        }
+        return await ipcRenderer.invoke('get-exam-stats', { userData: this.userData });
+      },
+
+      getRecentExams: async () => {
+        if (!this.userData) {
+          throw new Error('User not authenticated');
+        }
+        return await ipcRenderer.invoke('get-recent-exams', { userData: this.userData });
+      },
+
+      getRecentSubmissions: async () => {
+        if (!this.userData) {
+          throw new Error('User not authenticated');
+        }
+        return await ipcRenderer.invoke('get-recent-submissions', { userData: this.userData });
+      },
+
+      publishExam: async (examId) => {
+        if (!this.userData) {
+          throw new Error('User not authenticated');
+        }
+        return await ipcRenderer.invoke('publish-exam', {
+          examId,
+          userData: this.userData
+        });
       }
     });
   }

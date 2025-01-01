@@ -48,11 +48,7 @@ router.get(
   (req, res, next) => examController.getRecentExams(req, res, next)
 );
 
-router.get(
-  '/exams/submissions/recent',
-  protect,
-  (req, res, next) => examController.getRecentSubmissions(req, res, next)
-);
+
 
 router.post(
   '/exams/:id/submit',

@@ -1,125 +1,66 @@
 const Exam = require('../models/Exam');
 const ExamSubmission = require('../models/ExamSubmission');
-const Question = require('../models/base/BaseQuestion');
+// Fix the Question model import
+const mongoose = require('mongoose');
+const QuestionSchema = require('../models/Question');
+const Question = mongoose.model('Question', QuestionSchema);
 const ValidationService = require('../services/ValidationService');
 const ErrorResponse = require('../utils/errorResponse');
 
 class ExamController {
   // Create new exam
   createExam = async (req) => {
-    const { title, questions } = req.body;
+    try {
+        const { title, questions, creator } = req.body;
 
-    if (!title || !questions) {
-      throw new ErrorResponse('Title and questions are required', 400);
+        if (!title || !questions) {
+            throw new ErrorResponse('Title and questions are required', 400);
+        }
+
+        if (!creator) {
+            throw new ErrorResponse('Creator is required', 400);
+        }
+
+        // Validate exam
+        const validationErrors = ValidationService.validateExam({ title, questions });
+        if (validationErrors.length > 0) {
+            throw new ErrorResponse(validationErrors.join(', '), 400);
+        }
+
+        // Create questions first
+        const questionDocs = await Promise.all(
+            questions.map(async (q) => {
+                const questionData = {
+                    ...q,
+                    type: q.type || 'MultipleChoice'
+                };
+                return await Question.create(questionData);
+            })
+        );
+
+        // Create exam with question references
+        const examData = {
+            title,
+            creator, // This should now be properly set
+            status: req.body.status || 'draft',
+            questions: questionDocs.map(q => q._id)
+        };
+
+        console.log('Creating exam with data:', examData);
+
+        const exam = await Exam.create(examData);
+
+        // Populate the exam with question data
+        const populatedExam = await Exam.findById(exam._id)
+            .populate('questions')
+            .populate('creator', 'username');
+
+        return populatedExam;
+    } catch (error) {
+        console.error('Create exam error:', error);
+        throw new ErrorResponse(error.message || 'Failed to create exam', 500);
     }
-
-    const validationErrors = ValidationService.validateExam({ title, questions });
-    if (validationErrors.length > 0) {
-      throw new ErrorResponse(validationErrors.join(', '), 400);
-    }
-
-    const questionDocs = await Promise.all(
-      questions.map(async (q) => {
-        const question = await Question.create(q);
-        return question;
-      })
-    );
-
-    const exam = await Exam.create({
-      title,
-      creator: req.user.userId,
-      questions: questionDocs.map(q => q._id)
-    });
-
-    return exam;
-  };
-
-  // Get all exams
-  getExams = async (req) => {
-    let query;
-
-    if (req.user.role === 'teacher') {
-      query = Exam.find({ creator: req.user.userId });
-    } else {
-      query = Exam.find({ status: 'published' });
-    }
-
-    const exams = await query.populate('creator', 'username');
-    return exams;
-  };
-
-  // Get single exam
-  getExam = async (req) => {
-    const exam = await Exam.findById(req.params.id)
-      .populate('creator', 'username')
-      .populate('questions');
-
-    if (!exam) {
-      throw new ErrorResponse('Exam not found', 404);
-    }
-
-    if (exam.status === 'draft' && exam.creator._id.toString() !== req.user.userId) {
-      throw new ErrorResponse('Not authorized to access this exam', 403);
-    }
-
-    return exam;
-  };
-
-  // Update exam
-  updateExam = async (req) => {
-    let exam = await Exam.findById(req.params.id);
-
-    if (!exam) {
-      throw new ErrorResponse('Exam not found', 404);
-    }
-
-    if (exam.creator.toString() !== req.user.userId) {
-      throw new ErrorResponse('Not authorized to update this exam', 403);
-    }
-
-    exam = await Exam.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true
-    });
-
-    return exam;
-  };
-
-  // Delete exam
-  deleteExam = async (req) => {
-    const exam = await Exam.findById(req.params.id);
-
-    if (!exam) {
-      throw new ErrorResponse('Exam not found', 404);
-    }
-
-    if (exam.creator.toString() !== req.user.userId) {
-      throw new ErrorResponse('Not authorized to delete this exam', 403);
-    }
-
-    await Question.deleteMany({ _id: { $in: exam.questions } });
-    await exam.remove();
-
-    return { success: true };
-  };
-
-  // Publish exam
-  publishExam = async (req) => {
-    const exam = await Exam.findById(req.params.id);
-
-    if (!exam) {
-      throw new ErrorResponse('Exam not found', 404);
-    }
-
-    if (exam.creator.toString() !== req.user.userId) {
-      throw new ErrorResponse('Not authorized to publish this exam', 403);
-    }
-
-    exam.status = 'published';
-    await exam.save();
-
-    return exam;
-  };
+};
 
   // Get exam statistics
   getStats = async (req) => {
@@ -138,7 +79,6 @@ class ExamController {
         totalSubmissions
       };
     } catch (error) {
-      console.error('Error getting stats:', error);
       throw new ErrorResponse('Failed to fetch exam statistics', 500);
     }
   };
@@ -154,7 +94,6 @@ class ExamController {
 
       return recentExams;
     } catch (error) {
-      console.error('Error getting recent exams:', error);
       throw new ErrorResponse('Failed to fetch recent exams', 500);
     }
   };
@@ -170,84 +109,36 @@ class ExamController {
 
       return recentSubmissions;
     } catch (error) {
-      console.error('Error getting recent submissions:', error);
       throw new ErrorResponse('Failed to fetch recent submissions', 500);
     }
   };
 
-  // Submit exam
-  submitExam = async (req) => {
-    const { examId, answers } = req.body;
+  // Publish exam
+  publishExam = async (req) => {
+    try {
+      const exam = await Exam.findById(req.params.id);
 
-    const exam = await Exam.findOne({
-      _id: examId,
-      status: 'published'
-    });
-
-    if (!exam) {
-      throw new ErrorResponse('Exam not found or not published', 404);
-    }
-
-    const existingSubmission = await ExamSubmission.findOne({
-      exam: examId,
-      student: req.user.userId
-    });
-
-    if (existingSubmission) {
-      throw new ErrorResponse('You have already submitted this exam', 400);
-    }
-
-    if (!Array.isArray(answers)) {
-      throw new ErrorResponse('Invalid answers format', 400);
-    }
-
-    const submission = await ExamSubmission.create({
-      exam: examId,
-      student: req.user.userId,
-      answers: answers.map(answer => ({
-        question: answer.questionId,
-        answer: answer.answer,
-        timeSpent: answer.timeSpent
-      })),
-      status: 'submitted',
-      submitTime: Date.now()
-    });
-
-    return submission;
-  };
-
-  // Grade submission
-  gradeSubmission = async (req) => {
-    const submission = await ExamSubmission.findById(req.params.id)
-      .populate('exam');
-
-    if (!submission) {
-      throw new ErrorResponse('Submission not found', 404);
-    }
-
-    if (submission.exam.creator.toString() !== req.user.userId) {
-      throw new ErrorResponse('Not authorized to grade this submission', 403);
-    }
-
-    submission.answers = submission.answers.map(answer => {
-      const grade = req.body.grades.find(g => g.questionId === answer.question.toString());
-      if (grade) {
-        answer.score = grade.score;
-        answer.feedback = grade.feedback;
+      if (!exam) {
+        throw new ErrorResponse('Exam not found', 404);
       }
-      return answer;
-    });
 
-    submission.status = 'graded';
-    submission.gradedBy = req.user.userId;
-    submission.gradedAt = Date.now();
+      if (exam.creator.toString() !== req.user.userId) {
+        throw new ErrorResponse('Not authorized to publish this exam', 403);
+      }
 
-    await submission.save();
+      exam.status = 'published';
+      await exam.save();
 
-    return submission;
+      const populatedExam = await Exam.findById(exam._id)
+        .populate('questions')
+        .populate('creator', 'username');
+
+      return populatedExam;
+    } catch (error) {
+      console.error('Publish exam error:', error);
+      throw new ErrorResponse(error.message || 'Failed to publish exam', 500);
+    }
   };
 }
 
-module.exports = {
-  ExamController
-};
+module.exports = { ExamController };

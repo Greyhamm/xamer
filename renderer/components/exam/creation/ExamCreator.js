@@ -73,41 +73,44 @@ export default class ExamCreator {
   async saveExam(publish = false) {
     try {
       this.setState({ loading: true, error: null });
-
+  
       const examData = {
         title: this.state.title,
         questions: this.state.questions.map(q => q.getQuestionData()),
         status: publish ? 'published' : 'draft'
       };
-
+  
       // Validate exam data
       const errors = ValidationService.validateExam(examData);
       if (errors.length > 0) {
         throw new Error(errors.join('\n'));
       }
-
-      const response = await ExamState.saveExam(examData);
-      
-      if (publish) {
-        await ExamState.publishExam(response._id);
+  
+      console.log('Saving exam with data:', examData);
+      const savedExam = await ExamState.saveExam(examData);
+  
+      // Only publish if requested and exam was saved successfully
+      if (publish && savedExam) {
+        await ExamState.publishExam(savedExam._id);
       }
-
+  
       // Clear form
       this.setState({
         title: '',
         questions: [],
         loading: false
       });
-
+  
       alert(`Exam ${publish ? 'published' : 'saved'} successfully!`);
     } catch (error) {
+      console.error('Error saving exam:', error);
       this.setState({
         loading: false,
         error: error.message
       });
     }
   }
-
+  
   render() {
     const container = document.createElement('div');
     container.className = 'exam-creator-container';

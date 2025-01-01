@@ -45,7 +45,6 @@ export default class TeacherDashboard {
       await Promise.all([
         ExamState.getStats(),
         ExamState.getRecentExams(),
-        ExamState.getRecentSubmissions()
       ]);
 
       this.state.loading = false;

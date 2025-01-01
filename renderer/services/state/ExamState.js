@@ -1,114 +1,84 @@
 import ExamAPI from '../api/examAPI.js';
 
 class ExamState {
-  constructor() {
-    if (ExamState.instance) {
-      return ExamState.instance;
+    constructor() {
+        this.currentExam = null;
+        this.stats = null;
+        this.recentExams = [];
+        this.recentSubmissions = [];
+        this.listeners = new Set();
     }
-    ExamState.instance = this;
-    
-    this.currentExam = null;
-    this.stats = null;
-    this.recentExams = [];
-    this.recentSubmissions = [];
-    this.listeners = new Set();
-  }
 
-  addListener(callback) {
-    this.listeners.add(callback);
-  }
-
-  removeListener(callback) {
-    this.listeners.delete(callback);
-  }
-
-  notifyListeners() {
-    // Pass the entire state or relevant parts
-    const state = {
-      currentExam: this.currentExam,
-      stats: this.stats,
-      recentExams: this.recentExams,
-      recentSubmissions: this.recentSubmissions
-    };
-    this.listeners.forEach(callback => callback(state));
-  }
-
-  setCurrentExam(exam) {
-    this.currentExam = exam;
-    this.notifyListeners();
-  }
-
-  setStats(stats) {
-    this.stats = stats;
-    this.notifyListeners();
-  }
-
-  setRecentExams(exams) {
-    this.recentExams = exams;
-    this.notifyListeners();
-  }
-
-  setRecentSubmissions(submissions) {
-    this.recentSubmissions = submissions;
-    this.notifyListeners();
-  }
-
-  async saveExam(examData) {
-    try {
-      const response = await ExamAPI.createExam(examData);
-      this.setCurrentExam(response);
-      return response;
-    } catch (error) {
-      console.error('Save exam error:', error);
-      throw error;
+    addListener(callback) {
+        this.listeners.add(callback);
     }
-  }
 
-  async publishExam(examId) {
-    try {
-      const response = await ExamAPI.publishExam(examId);
-      this.setCurrentExam(response);
-      return response;
-    } catch (error) {
-      console.error('Publish exam error:', error);
-      throw error;
+    removeListener(callback) {
+        this.listeners.delete(callback);
     }
-  }
 
-  // Added Methods
-
-  async getStats() {
-    try {
-      const stats = await ExamAPI.getStats();
-      this.setStats(stats);
-      return stats;
-    } catch (error) {
-      console.error('Failed to get stats:', error);
-      throw error;
+    notifyListeners() {
+        const state = {
+            currentExam: this.currentExam,
+            stats: this.stats,
+            recentExams: this.recentExams,
+            recentSubmissions: this.recentSubmissions
+        };
+        this.listeners.forEach(callback => callback(state));
     }
-  }
 
-  async getRecentExams() {
-    try {
-      const recentExams = await ExamAPI.getRecentExams();
-      this.setRecentExams(recentExams);
-      return recentExams;
-    } catch (error) {
-      console.error('Failed to get recent exams:', error);
-      throw error;
+    setCurrentExam(exam) {
+        this.currentExam = exam;
+        this.notifyListeners();
     }
-  }
 
-  async getRecentSubmissions() {
-    try {
-      const recentSubmissions = await ExamAPI.getRecentSubmissions();
-      this.setRecentSubmissions(recentSubmissions);
-      return recentSubmissions;
-    } catch (error) {
-      console.error('Failed to get recent submissions:', error);
-      throw error;
+    async saveExam(examData) {
+        try {
+            console.log('Saving exam with data:', examData);
+            const response = await ExamAPI.createExam(examData);
+            console.log('Save exam response:', response);
+            this.setCurrentExam(response);
+            return response;
+        } catch (error) {
+            console.error('Save exam error:', error);
+            throw error;
+        }
     }
-  }
+
+    async publishExam(examId) {
+        try {
+            const response = await ExamAPI.publishExam(examId);
+            this.setCurrentExam(response);
+            return response;
+        } catch (error) {
+            console.error('Publish exam error:', error);
+            throw error;
+        }
+    }
+
+    async getStats() {
+        try {
+            const stats = await ExamAPI.getStats();
+            this.stats = stats;
+            this.notifyListeners();
+            return stats;
+        } catch (error) {
+            console.error('Get stats error:', error);
+            throw error;
+        }
+    }
+
+    async getRecentExams() {
+        try {
+            const recentExams = await ExamAPI.getRecentExams();
+            this.recentExams = recentExams;
+            this.notifyListeners();
+            return recentExams;
+        } catch (error) {
+            console.error('Get recent exams error:', error);
+            throw error;
+        }
+    }
 }
 
 export default new ExamState();

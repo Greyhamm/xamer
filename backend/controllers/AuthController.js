@@ -78,12 +78,15 @@ class AuthController {
     const token = user.getSignedJwtToken();
     console.log('JWT token generated for login:', token);
 
+    // Send response with user data
     res.status(200).json({
       success: true,
       token,
-      role: user.role
+      userId: user._id.toString(), // Ensure it's a string
+      role: user.role,
+      username: user.username
     });
-  });
+});
 
   // @desc    Get current logged in user
   // @route   GET /api/auth/profile
