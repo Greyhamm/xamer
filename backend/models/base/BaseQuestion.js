@@ -8,7 +8,11 @@ const MediaSchema = new mongoose.Schema({
 
 const BaseQuestionSchema = new mongoose.Schema({
   prompt: { type: String, required: true },
-  type: { type: String, required: true },
+  type: { 
+    type: String, 
+    required: true, 
+    enum: ['MultipleChoice', 'Written', 'Coding'] 
+  },
   media: { type: MediaSchema, default: null },
 }, {
   discriminatorKey: 'type',
@@ -17,4 +21,4 @@ const BaseQuestionSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-module.exports = BaseQuestionSchema;
+module.exports = mongoose.models.Question || mongoose.model('Question', BaseQuestionSchema);

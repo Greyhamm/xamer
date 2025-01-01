@@ -42,7 +42,6 @@ ExamSchema.pre(/^find/, function(next) {
   });
   next();
 });
-
 // Calculate total points before saving
 ExamSchema.pre('save', async function(next) {
   if (this.isModified('questions')) {

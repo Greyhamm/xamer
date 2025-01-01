@@ -15,27 +15,59 @@ class ExamController {
             if (!title || !questions || !userData) {
                 throw new ErrorResponse('Title, questions, and user data are required', 400);
             }
-
+    
             // Validate exam
             const validationErrors = ValidationService.validateExam({ title, questions });
             if (validationErrors.length > 0) {
                 throw new ErrorResponse(validationErrors.join(', '), 400);
             }
-
+    
+            // Import question models
+            const Question = require('../models/base/BaseQuestion');
+            const MultipleChoiceQuestion = require('../models/questions/MultipleChoiceQuestion');
+            const WrittenQuestion = require('../models/questions/WrittenQuestion');
+            const CodingQuestion = require('../models/questions/CodingQuestion');
+    
             // Create questions first
             const questionDocs = await Promise.all(
                 questions.map(async (q) => {
+                    let questionModel;
+                    switch (q.type) {
+                        case 'MultipleChoice':
+                            questionModel = MultipleChoiceQuestion;
+                            break;
+                        case 'Written':
+                            questionModel = WrittenQuestion;
+                            break;
+                        case 'Coding':
+                            questionModel = CodingQuestion;
+                            break;
+                        default:
+                            throw new ErrorResponse(`Unsupported question type: ${q.type}`, 400);
+                    }
+    
                     const questionData = {
                         prompt: q.prompt,
                         type: q.type,
-                        options: q.options,
-                        correctOption: q.correctOption,
                         media: q.media
                     };
-                    return await Question.create(questionData);
+    
+                    // Add type-specific fields
+                    if (q.type === 'MultipleChoice') {
+                        questionData.options = q.options;
+                        questionData.correctOption = q.correctOption;
+                    } else if (q.type === 'Coding') {
+                        questionData.language = q.language;
+                        questionData.initialCode = q.initialCode;
+                    } else if (q.type === 'Written') {
+                        questionData.maxWords = q.maxWords;
+                        questionData.rubric = q.rubric;
+                    }
+    
+                    return await questionModel.create(questionData);
                 })
             );
-
+    
             // Create exam with question references
             const examData = {
                 title,
@@ -43,22 +75,24 @@ class ExamController {
                 status: req.body.status || 'draft',
                 questions: questionDocs.map(q => q._id)
             };
-
+    
             const exam = await Exam.create(examData);
-
+    
             // Populate the exam with question data
             const populatedExam = await Exam.findById(exam._id)
-                .populate('questions')
+                .populate({
+                    path: 'questions',
+                    populate: { path: '_id' }
+                })
                 .populate('creator', 'username')
                 .lean(); // Convert to plain JavaScript object
-
+    
             return populatedExam;
         } catch (error) {
             console.error('Create exam error:', error);
             throw new ErrorResponse(error.message || 'Failed to create exam', 500);
         }
     }
-
     async getStats(req) {
         try {
             const stats = await Promise.all([

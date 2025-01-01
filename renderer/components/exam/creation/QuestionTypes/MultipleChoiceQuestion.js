@@ -16,8 +16,9 @@ export default class MultipleChoiceQuestion extends BaseQuestion {
 
   getQuestionData() {
     return {
-      type: this.type, // Ensure type is set
+      type: this.type,
       prompt: this.state.prompt,
+      media: this.state.media,
       options: this.state.options,
       correctOption: this.state.correctOption
     };

@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const BaseQuestionSchema = require('../base/BaseQuestion');
+const Question = require('../base/BaseQuestion');
 
 const CodingQuestionSchema = new mongoose.Schema({
   language: { 
@@ -18,5 +18,6 @@ const CodingQuestionSchema = new mongoose.Schema({
   }]
 });
 
-const Question = mongoose.model('Question', BaseQuestionSchema);
-module.exports = Question.discriminator('Coding', CodingQuestionSchema);
+// Check if the discriminator already exists
+module.exports = mongoose.models['Coding'] || 
+  Question.discriminator('Coding', CodingQuestionSchema);
