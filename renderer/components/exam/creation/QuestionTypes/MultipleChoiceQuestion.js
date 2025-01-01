@@ -121,7 +121,13 @@ export default class MultipleChoiceQuestion extends BaseQuestion {
   }
 
   dispose() {
-    this.inputs.clear();
+    // Call parent dispose
     super.dispose();
+    // Clean up MultipleChoiceQuestion specific resources
+    if (this.inputs) {
+      this.inputs.clear();
+      this.inputs = null;
+    }
+    this.state = null;
   }
 }

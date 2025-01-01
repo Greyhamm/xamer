@@ -122,10 +122,15 @@ export default class CodingQuestion extends BaseQuestion {
   }
   
   dispose() {
+    // Call parent dispose
+    super.dispose();
+    // Clean up CodingQuestion specific resources
     if (this.editor) {
       this.editor.dispose();
       this.editor = null;
-      this.isEditorInitialized = false;
     }
+    this.editorContainer = null;
+    this.isEditorInitialized = false;
+    this.state = null;
   }
 }

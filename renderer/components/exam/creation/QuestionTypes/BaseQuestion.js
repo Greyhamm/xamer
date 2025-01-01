@@ -1,9 +1,9 @@
 import Input from '../../../common/Input.js';
 import Button from '../../../common/Button.js';
 
-export default class BaseQuestion {
+class BaseQuestion {
   constructor(options = {}) {
-    this.type = options.type || this.type; // Ensure type is set
+    this.type = options.type || this.type;
     this.state = {
       prompt: options.prompt || '',
       media: options.media || null,
@@ -15,7 +15,6 @@ export default class BaseQuestion {
   }
 
   setState(newState) {
-    // Deep clone the state to prevent unintended mutations
     const updatedState = { 
       ...this.state, 
       ...Object.keys(newState).reduce((acc, key) => {
@@ -26,32 +25,8 @@ export default class BaseQuestion {
 
     this.state = updatedState;
     
-    // Ensure prompt input is updated if it exists
     if (this.promptInput && this.promptInput.getValue() !== this.state.prompt) {
       this.promptInput.setValue(this.state.prompt);
-    }
-
-    // Call onChange with full question data
-    // if (this.onChange) {
-    //   this.onChange(this.getQuestionData());
-    // }
-  }
-
-  /**
-   * Call this method when saving the exam.
-   */
-  save() {
-    if (this.onChange) {
-      this.onChange(this.getQuestionData());
-    }
-  }
-
-  /**
-   * Call this method when publishing the exam.
-   */
-  publish() {
-    if (this.onChange) {
-      this.onChange(this.getQuestionData());
     }
   }
 
@@ -67,22 +42,20 @@ export default class BaseQuestion {
     typeLabel.className = 'question-type';
     typeLabel.textContent = this.type;
 
-    const deleteButton = new Button({
-      text: 'Delete',
-      className: 'btn-danger btn-sm',
-      onClick: () => this.onDelete?.()
-    });
+    const deleteButton = document.createElement('button');
+    deleteButton.className = 'btn btn-danger btn-sm';
+    deleteButton.textContent = 'Delete';
+    deleteButton.onclick = () => this.onDelete?.();
 
     header.appendChild(typeLabel);
-    header.appendChild(deleteButton.render());
+    header.appendChild(deleteButton);
     container.appendChild(header);
 
-    // Prompt input with improved handling
+    // Prompt input
     this.promptInput = new Input({
       placeholder: 'Enter question prompt...',
       value: this.state.prompt,
       onChange: (value) => {
-        // Prevent unnecessary state updates
         if (value !== this.state.prompt) {
           this.setState({ prompt: value });
         }
@@ -126,7 +99,6 @@ export default class BaseQuestion {
           const data = await response.json();
           this.setState({ media: data });
           
-          // Show preview
           this.updateMediaPreview(container);
         } catch (error) {
           console.error('Media upload error:', error);
@@ -137,12 +109,10 @@ export default class BaseQuestion {
 
     container.appendChild(input);
 
-    // Add preview container
     const previewContainer = document.createElement('div');
     previewContainer.className = 'media-preview';
     container.appendChild(previewContainer);
 
-    // Update preview if media exists
     if (this.state.media) {
       this.updateMediaPreview(container);
     }
@@ -168,16 +138,14 @@ export default class BaseQuestion {
 
       previewContainer.appendChild(element);
 
-      // Add remove button
-      const removeButton = new Button({
-        text: 'Remove',
-        className: 'btn-danger btn-sm',
-        onClick: () => {
-          this.setState({ media: null });
-          previewContainer.innerHTML = '';
-        }
-      });
-      previewContainer.appendChild(removeButton.render());
+      const removeButton = document.createElement('button');
+      removeButton.className = 'btn btn-danger btn-sm';
+      removeButton.textContent = 'Remove';
+      removeButton.onclick = () => {
+        this.setState({ media: null });
+        previewContainer.innerHTML = '';
+      };
+      previewContainer.appendChild(removeButton);
     }
   }
 
@@ -191,4 +159,16 @@ export default class BaseQuestion {
   render() {
     return this.createQuestionContainer();
   }
+
+  // Add base dispose method
+  dispose() {
+    // Clean up any event listeners or resources
+    if (this.promptInput) {
+      this.promptInput = null;
+    }
+    this.onDelete = null;
+    this.onChange = null;
+  }
 }
+
+export default BaseQuestion;

@@ -63,4 +63,11 @@ export default class WrittenQuestion extends BaseQuestion {
 
     return container;
   }
+
+  dispose() {
+    // Call parent dispose
+    super.dispose();
+    // Clean up any WrittenQuestion specific resources
+    this.state = null;
+  }
 }
