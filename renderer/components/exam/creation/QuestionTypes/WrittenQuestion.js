@@ -14,7 +14,8 @@ export default class WrittenQuestion extends BaseQuestion {
 
   getQuestionData() {
     return {
-      ...super.getQuestionData(),
+      type: this.type, // Ensure type is set
+      prompt: this.state.prompt,
       maxWords: this.state.maxWords,
       rubric: this.state.rubric
     };

@@ -27,6 +27,15 @@ export default class CodingQuestion extends BaseQuestion {
     }
   }
 
+  getQuestionData() {
+    return {
+      type: this.type, // Ensure type is set
+      prompt: this.state.prompt,
+      language: this.state.language,
+      initialCode: this.state.initialCode
+    };
+  }
+
   render() {
     const container = super.createQuestionContainer();
 

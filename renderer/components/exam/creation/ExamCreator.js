@@ -52,16 +52,17 @@ export default class ExamCreator {
       console.error(`Unknown question type: ${type}`);
       return;
     }
-
+  
     const question = new QuestionClass({
       onDelete: () => this.removeQuestion(question),
-      onChange: () => this.updateUI()
+      onChange: () => this.updateUI(),
+      // Explicitly set the type here
+      type: type
     });
-
+  
     this.state.questions.push(question);
     this.updateUI();
   }
-
   removeQuestion(question) {
     const index = this.state.questions.indexOf(question);
     if (index !== -1) {

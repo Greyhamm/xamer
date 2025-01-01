@@ -3,7 +3,7 @@ import Button from '../../../common/Button.js';
 
 export default class BaseQuestion {
   constructor(options = {}) {
-    this.type = 'base';
+    this.type = options.type || this.type; // Ensure type is set
     this.state = {
       prompt: options.prompt || '',
       media: options.media || null,
@@ -11,7 +11,7 @@ export default class BaseQuestion {
     };
     this.onDelete = options.onDelete;
     this.onChange = options.onChange;
-    this.promptInput = null; // Store reference to prompt input
+    this.promptInput = null;
   }
 
   setState(newState) {
@@ -32,6 +32,24 @@ export default class BaseQuestion {
     }
 
     // Call onChange with full question data
+    // if (this.onChange) {
+    //   this.onChange(this.getQuestionData());
+    // }
+  }
+
+  /**
+   * Call this method when saving the exam.
+   */
+  save() {
+    if (this.onChange) {
+      this.onChange(this.getQuestionData());
+    }
+  }
+
+  /**
+   * Call this method when publishing the exam.
+   */
+  publish() {
     if (this.onChange) {
       this.onChange(this.getQuestionData());
     }
@@ -161,6 +179,13 @@ export default class BaseQuestion {
       });
       previewContainer.appendChild(removeButton.render());
     }
+  }
+
+  getQuestionData() {
+    return {
+      prompt: this.state.prompt,
+      media: this.state.media
+    };
   }
 
   render() {
