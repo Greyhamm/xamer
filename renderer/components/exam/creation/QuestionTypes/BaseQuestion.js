@@ -73,32 +73,23 @@ class BaseQuestion {
   createMediaUpload() {
     const container = document.createElement('div');
     container.className = 'media-upload';
-
+  
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*,video/*';
     input.className = 'media-input';
-
+  
     input.addEventListener('change', async (e) => {
       const file = e.target.files[0];
       if (file) {
         try {
-          const formData = new FormData();
-          formData.append('media', file);
+          const response = await window.api.uploadMedia(file);
           
-          const response = await fetch('/api/media/upload', {
-            method: 'POST',
-            body: formData,
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            }
-          });
-
-          if (!response.ok) throw new Error('Upload failed');
+          if (!response.success) {
+            throw new Error(response.error || 'Upload failed');
+          }
           
-          const data = await response.json();
-          this.setState({ media: data });
-          
+          this.setState({ media: response.data });
           this.updateMediaPreview(container);
         } catch (error) {
           console.error('Media upload error:', error);
@@ -106,40 +97,67 @@ class BaseQuestion {
         }
       }
     });
-
+  
     container.appendChild(input);
-
+  
     const previewContainer = document.createElement('div');
     previewContainer.className = 'media-preview';
     container.appendChild(previewContainer);
-
+  
     if (this.state.media) {
       this.updateMediaPreview(container);
     }
-
+  
     return container;
   }
 
   updateMediaPreview(container) {
+    if (!container) return;
+  
     const previewContainer = container.querySelector('.media-preview');
+    if (!previewContainer) return;
+  
     previewContainer.innerHTML = '';
-
+  
     if (this.state.media) {
       const element = this.state.media.type === 'image' 
         ? document.createElement('img')
         : document.createElement('video');
-
-      element.src = this.state.media.url;
+  
+      // Construct proper URL using localhost
+      const url = this.state.media.url.startsWith('http')
+        ? this.state.media.url
+        : `http://localhost:3000${this.state.media.url}`;
+  
+      element.src = url;
       element.className = 'media-preview-content';
       
       if (this.state.media.type === 'video') {
         element.controls = true;
       }
-
+  
+      // Add loading state and error handling
+      element.style.display = 'none';
+      const loadingText = document.createElement('div');
+      loadingText.textContent = 'Loading preview...';
+      loadingText.className = 'preview-loading';
+      previewContainer.appendChild(loadingText);
+  
+      element.onload = () => {
+        loadingText.remove();
+        element.style.display = 'block';
+      };
+  
+      element.onerror = () => {
+        loadingText.textContent = 'Preview not available yet. Preview will be available after saving.';
+        loadingText.className = 'preview-error';
+      };
+  
       previewContainer.appendChild(element);
-
+  
+      // Add remove button
       const removeButton = document.createElement('button');
-      removeButton.className = 'btn btn-danger btn-sm';
+      removeButton.className = 'btn btn-danger btn-sm remove-media';
       removeButton.textContent = 'Remove';
       removeButton.onclick = () => {
         this.setState({ media: null });

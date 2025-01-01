@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const express = require('express');
+const fs = require('fs');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const mongoose = require('mongoose');
@@ -24,6 +25,13 @@ const EXPRESS_PORT = process.env.PORT || 3000;
 expressApp.use(cors());
 expressApp.use(bodyParser.json());
 
+// Create uploads directory if it doesn't exist
+const uploadDir = path.join(__dirname, '..', 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+
 // Connect to MongoDB
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/electron_exam_app';
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -34,7 +42,9 @@ mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true 
 expressApp.use('/api/auth', authRoutes);
 expressApp.use('/api', examRoutes);
 expressApp.use('/api', codeExecutionRoutes);
-expressApp.use('/api', mediaRoutes);
+expressApp.use('/api/media', mediaRoutes); 
+
+// Serve static files from uploads directory
 expressApp.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 // Start Express Server

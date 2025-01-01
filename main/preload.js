@@ -138,8 +138,38 @@ class PreloadBridge {
             userData: this.userData
         });
       },
+      
+      uploadMedia: async (file) => {
+        return await this.uploadMedia(file);
+      },
     });
   }
+
+  async uploadMedia(file) {
+    try {
+      const formData = new FormData();
+      formData.append('media', file);
+  
+      const response = await fetch('http://localhost:3000/api/media/upload', {
+        method: 'POST',
+        headers: {
+          ...this.getAuthHeader()
+        },
+        body: formData
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Upload failed');
+      }
+  
+      return await response.json();
+    } catch (error) {
+      console.error('Media upload error:', error);
+      throw error;
+    }
+  }
+  
 }
 
 // Initialize preload bridge

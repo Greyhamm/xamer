@@ -3,8 +3,8 @@ const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
 class MediaService {
-  constructor(uploadDir = 'uploads') {
-    this.uploadDir = uploadDir;
+  constructor() {
+    this.uploadDir = path.join(__dirname, '../../uploads');
     this.ensureUploadDirectory();
   }
 
@@ -22,6 +22,7 @@ class MediaService {
     const filepath = path.join(this.uploadDir, filename);
 
     await fs.writeFile(filepath, file.buffer);
+    
     return {
       name: file.originalname,
       type: file.mimetype.startsWith('image/') ? 'image' : 'video',
@@ -29,14 +30,8 @@ class MediaService {
     };
   }
 
-  async deleteFile(filename) {
-    const filepath = path.join(this.uploadDir, filename);
-    try {
-      await fs.unlink(filepath);
-      return true;
-    } catch {
-      return false;
-    }
+  getUploadPath() {
+    return this.uploadDir;
   }
 }
 
