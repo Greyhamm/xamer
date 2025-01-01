@@ -1,30 +1,52 @@
 export default class MonacoEditor {
   constructor(options = {}) {
-    this.options = options;
+    this.options = {
+      ...options,
+      onChange: this.debouncedOnChange.bind(this)
+    };
     this.editor = null;
     this.container = null;
-    this.resizeObserver = null;
+    this.changeTimeout = null;
+  }
+
+  // Debounced onChange to prevent excessive calls
+  debouncedOnChange(value) {
+    if (this.changeTimeout) {
+      clearTimeout(this.changeTimeout);
+    }
+    
+    this.changeTimeout = setTimeout(() => {
+      if (this.options.onChange) {
+        this.options.onChange(value);
+      }
+    }, 300); // Adjust delay as needed
   }
 
   mount(container) {
+    // Extensive error checking
     if (!window.monaco) {
       console.error('Monaco Editor not loaded');
       return;
     }
-
+  
     if (!container || !(container instanceof Element)) {
       console.error('Invalid container element');
       return;
     }
-
-    // Don't create a new editor if one already exists for this container
-    if (this.editor) {
-      console.warn('Editor already mounted');
-      return;
+  
+    // Comprehensive cleanup
+    try {
+      if (this.editor) {
+        this.editor.dispose();
+      }
+    } catch (disposeError) {
+      console.warn('Error disposing previous editor:', disposeError);
     }
-
+  
+    // Reset container
     this.container = container;
-
+    this.container.innerHTML = '';
+  
     // Define theme directly
     monaco.editor.defineTheme('examTheme', {
       base: 'vs-dark',
@@ -43,7 +65,7 @@ export default class MonacoEditor {
     monaco.editor.setTheme('examTheme');
 
     // Create editor with specific configuration
-    const editorConfig = {
+    this.editor = monaco.editor.create(this.container, {
       value: this.options.value || '',
       language: this.options.language || 'javascript',
       theme: 'examTheme',
@@ -54,65 +76,57 @@ export default class MonacoEditor {
       readOnly: this.options.readOnly || false,
       fontSize: 14,
       wordWrap: 'on',
-      formatOnType: true,
-      formatOnPaste: true,
-      suggestOnTriggerCharacters: true,
-      acceptSuggestionOnEnter: 'on',
-      folding: true,
-      renderWhitespace: 'selection',
-      dragAndDrop: true,
-      links: true,
-      contextmenu: true
-    };
-
-    // Create editor
-    this.editor = monaco.editor.create(this.container, editorConfig);
-
-    // Force immediate layout update
-    requestAnimationFrame(() => {
-      if (this.editor) {
-        this.editor.layout();
-      }
+      fixedOverflowWidgets: true,
+      scrollbar: {
+        vertical: 'visible',
+        horizontal: 'visible',
+        useShadows: false
+      },
+      overviewRulerLanes: 0,
+      overviewRulerBorder: false,
+      hideCursorInOverviewRuler: true
     });
 
-    // Add change listener if provided
-    if (this.options.onChange) {
-      this.editor.onDidChangeModelContent(() => {
-        this.options.onChange(this.editor.getValue());
-      });
-    }
+    // Add change listener with debounce
+    this.editor.onDidChangeModelContent(() => {
+      const value = this.editor.getValue();
+      this.debouncedOnChange(value);
+    });
 
     // Setup resize handling
     this.setupResizeHandling();
   }
 
+  updateLayout = () => {
+    if (!this.editor || !this.container) return;
+
+    // Clear any pending layout timeout
+    if (this.layoutTimeout) {
+      clearTimeout(this.layoutTimeout);
+    }
+
+    // Schedule a new layout update
+    this.layoutTimeout = setTimeout(() => {
+      if (this.editor) {
+        this.editor.layout();
+      }
+    }, 10);
+  }
+
   setupResizeHandling() {
-    // Remove any existing observer
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
     }
 
-    // Create new resize observer
     this.resizeObserver = new ResizeObserver(() => {
-      if (this.editor) {
-        this.editor.layout();
-      }
+      this.updateLayout();
     });
 
     if (this.container) {
       this.resizeObserver.observe(this.container);
     }
 
-    // Add window resize handler
-    window.addEventListener('resize', this.handleResize);
-  }
-
-  handleResize = () => {
-    if (this.editor) {
-      requestAnimationFrame(() => {
-        this.editor.layout();
-      });
-    }
+    window.addEventListener('resize', this.updateLayout);
   }
 
   getValue() {
@@ -122,11 +136,16 @@ export default class MonacoEditor {
   setValue(value) {
     if (this.editor) {
       this.editor.setValue(value || '');
+      this.updateLayout();
     }
   }
 
   dispose() {
-    window.removeEventListener('resize', this.handleResize);
+    window.removeEventListener('resize', this.updateLayout);
+
+    if (this.layoutTimeout) {
+      clearTimeout(this.layoutTimeout);
+    }
 
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();

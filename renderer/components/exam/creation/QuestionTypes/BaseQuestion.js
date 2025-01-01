@@ -11,34 +11,30 @@ export default class BaseQuestion {
     };
     this.onDelete = options.onDelete;
     this.onChange = options.onChange;
+    this.promptInput = null; // Store reference to prompt input
   }
 
   setState(newState) {
-    this.state = { ...this.state, ...newState };
-    this.updateUI();
+    // Deep clone the state to prevent unintended mutations
+    const updatedState = { 
+      ...this.state, 
+      ...Object.keys(newState).reduce((acc, key) => {
+        acc[key] = newState[key];
+        return acc;
+      }, {}) 
+    };
+
+    this.state = updatedState;
+    
+    // Ensure prompt input is updated if it exists
+    if (this.promptInput && this.promptInput.getValue() !== this.state.prompt) {
+      this.promptInput.setValue(this.state.prompt);
+    }
+
+    // Call onChange with full question data
     if (this.onChange) {
       this.onChange(this.getQuestionData());
     }
-  }
-
-  updateUI() {
-    // Implement in child classes
-  }
-
-  getQuestionData() {
-    return {
-      type: this.type,
-      prompt: this.state.prompt,
-      media: this.state.media
-    };
-  }
-
-  validate() {
-    const errors = [];
-    if (!this.state.prompt.trim()) {
-      errors.push('Question prompt is required');
-    }
-    return errors;
   }
 
   createQuestionContainer() {
@@ -63,13 +59,18 @@ export default class BaseQuestion {
     header.appendChild(deleteButton.render());
     container.appendChild(header);
 
-    // Prompt input
-    const promptInput = new Input({
+    // Prompt input with improved handling
+    this.promptInput = new Input({
       placeholder: 'Enter question prompt...',
       value: this.state.prompt,
-      onChange: (value) => this.setState({ prompt: value })
+      onChange: (value) => {
+        // Prevent unnecessary state updates
+        if (value !== this.state.prompt) {
+          this.setState({ prompt: value });
+        }
+      }
     });
-    container.appendChild(promptInput.render());
+    container.appendChild(this.promptInput.render());
 
     // Media upload
     const mediaContainer = this.createMediaUpload();

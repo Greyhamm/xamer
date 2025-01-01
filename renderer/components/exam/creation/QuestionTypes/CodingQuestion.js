@@ -84,24 +84,50 @@ export default class CodingQuestion extends BaseQuestion {
   }
 
   initializeEditor() {
-    // Don't initialize if we already have an editor
-    if (this.editor || !this.editorContainer) {
-      return;
-    }
-
-    // Clear any existing content
-    this.editorContainer.innerHTML = '';
-
-    this.editor = new MonacoEditor({
-      language: this.state.language,
-      value: this.state.initialCode,
-      onChange: (value) => {
-        this.setState({ initialCode: value });
+    // Ensure clean slate and prevent memory leaks
+    if (this.editor) {
+      try {
+        this.editor.dispose();
+      } catch (error) {
+        console.warn('Error disposing previous editor:', error);
       }
-    });
-    this.editor.mount(this.editorContainer);
+      this.editor = null;
+    }
+  
+    // Ensure container exists and is clean
+    if (!this.editorContainer) return;
+    this.editorContainer.innerHTML = '';
+  
+    // Create new editor with robust error handling
+    try {
+      this.editor = new MonacoEditor({
+        language: this.state.language,
+        value: this.state.initialCode || '',
+        onChange: (value) => {
+          // Use requestAnimationFrame to ensure state update is async
+          requestAnimationFrame(() => {
+            this.setState({ initialCode: value });
+          });
+        },
+        readOnly: false
+      });
+  
+      // Mount with error handling
+      requestAnimationFrame(() => {
+        if (this.editorContainer) {
+          try {
+            this.editor.mount(this.editorContainer);
+          } catch (mountError) {
+            console.error('Error mounting editor:', mountError);
+          }
+        }
+      });
+    } catch (editorError) {
+      console.error('Error creating Monaco Editor:', editorError);
+    }
   }
-
+  
+  
   dispose() {
     if (this.editor) {
       this.editor.dispose();

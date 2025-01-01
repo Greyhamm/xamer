@@ -11,6 +11,7 @@ export default class MultipleChoiceQuestion extends BaseQuestion {
       options: options.options || ['', '', '', ''],
       correctOption: options.correctOption || null
     };
+    this.inputs = new Map();
   }
 
   getQuestionData() {
@@ -58,22 +59,67 @@ export default class MultipleChoiceQuestion extends BaseQuestion {
         this.setState({ correctOption: index });
       });
 
-      const optionInput = new Input({
-        value: option,
-        placeholder: `Option ${index + 1}`,
-        onChange: (value) => {
-          const newOptions = [...this.state.options];
-          newOptions[index] = value;
-          this.setState({ options: newOptions });
-        }
+      const inputContainer = document.createElement('div');
+      inputContainer.className = 'input-container';
+      inputContainer.style.flex = '1';
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'form-control';
+      input.value = option;
+      input.placeholder = `Option ${index + 1}`;
+      
+      // Use input event instead of onChange
+      input.addEventListener('input', (e) => {
+        const newOptions = [...this.state.options];
+        newOptions[index] = e.target.value;
+        this.setState({ options: newOptions });
       });
 
+      // Store reference to input
+      this.inputs.set(index, input);
+
+      inputContainer.appendChild(input);
       optionGroup.appendChild(radio);
-      optionGroup.appendChild(optionInput.render());
+      optionGroup.appendChild(inputContainer);
       optionsContainer.appendChild(optionGroup);
     });
 
+    // Add/Remove options buttons
+    const buttonGroup = document.createElement('div');
+    buttonGroup.className = 'button-group';
+
+    const addButton = new Button({
+      text: 'Add Option',
+      className: 'btn-secondary',
+      onClick: () => {
+        const newOptions = [...this.state.options, ''];
+        this.setState({ options: newOptions });
+      }
+    });
+
+    const removeButton = new Button({
+      text: 'Remove Option',
+      className: 'btn-secondary',
+      onClick: () => {
+        if (this.state.options.length > 2) {
+          const newOptions = this.state.options.slice(0, -1);
+          this.setState({ options: newOptions });
+        }
+      }
+    });
+
+    buttonGroup.appendChild(addButton.render());
+    buttonGroup.appendChild(removeButton.render());
+
     container.appendChild(optionsContainer);
+    container.appendChild(buttonGroup);
+
     return container;
+  }
+
+  dispose() {
+    this.inputs.clear();
+    super.dispose();
   }
 }
