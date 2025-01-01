@@ -1,4 +1,3 @@
-// main/main.js
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const express = require('express');
@@ -38,7 +37,7 @@ expressApp.use('/api', codeExecutionRoutes);
 expressApp.use('/api', mediaRoutes);
 expressApp.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-// Start Express Server and Store the Server Instance
+// Start Express Server
 const server = expressApp.listen(EXPRESS_PORT, () => {
   console.log(`Express server running on http://localhost:${EXPRESS_PORT}`);
 });
@@ -52,12 +51,33 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-    },
+      worldSafeExecuteJavaScript: true,
+      sandbox: true
+    }
+  });
+
+  // Set CSP headers
+  win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self';",
+          "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://unpkg.com;",
+          "style-src 'self' 'unsafe-inline' https://unpkg.com;",
+          "font-src 'self' https://unpkg.com;",
+          "connect-src 'self' http://localhost:3000 https://unpkg.com;",
+          "img-src 'self' http://localhost:3000/uploads/ blob: data:;",
+          "worker-src 'self' blob: data:;",
+          "child-src 'self' blob: data:;"
+        ].join(' ')
+      }
+    });
   });
 
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
-  // Uncomment the following line to open DevTools by default
+  // Uncomment to open DevTools by default
   // win.webContents.openDevTools();
 }
 

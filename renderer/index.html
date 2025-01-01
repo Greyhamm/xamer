@@ -1,20 +1,10 @@
-<!-- renderer/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Electron Exam App</title>
   <link rel="stylesheet" href="styles/main.css">
-  <!-- Updated Content Security Policy -->
-    <meta http-equiv="Content-Security-Policy" content="
-    default-src 'self';
-    script-src 'self' 'unsafe-inline' https://unpkg.com;
-    style-src 'self' 'unsafe-inline' https://unpkg.com;
-    font-src 'self' https://unpkg.com;
-    connect-src 'self' http://localhost:3000;
-    img-src 'self' http://localhost:3000/uploads/ blob: data:;
-    worker-src 'self' blob:;
-  ">
+  <!-- Remove the CSP meta tag since we're handling it in main.js -->
 </head>
 <body>
   <div id="app">
@@ -30,24 +20,39 @@
     </main>
   </div>
 
-  <!-- Include Monaco Editor via CDN -->
+  <!-- Monaco Editor setup -->
   <script src="https://unpkg.com/monaco-editor@0.33.0/min/vs/loader.js"></script>
   <script>
-    require.config({ paths: { 'vs': 'https://unpkg.com/monaco-editor@0.33.0/min/vs' }});
-    window.MonacoEnvironment = { getWorkerUrl: () => proxy };
-    let proxy = URL.createObjectURL(new Blob([`
-      self.MonacoEnvironment = { baseUrl: 'https://unpkg.com/monaco-editor@0.33.0/min/' };
-      importScripts('https://unpkg.com/monaco-editor@0.33.0/min/vs/base/worker/workerMain.js');
-    `], { type: 'text/javascript' }));
+    // Configure AMD loader for Monaco
+    require.config({
+      paths: {
+        vs: 'https://unpkg.com/monaco-editor@0.33.0/min/vs'
+      }
+    });
 
-    // Load Monaco Editor and assign it to window.monaco
+    window.MonacoEnvironment = {
+      getWorkerUrl: function(moduleId, label) {
+        const workerPath = label === 'typescript' || label === 'javascript' 
+          ? '/vs/language/typescript/ts.worker' 
+          : '/vs/editor/editor.worker';
+        
+        return `data:text/javascript;charset=utf-8,${encodeURIComponent(`
+          self.MonacoEnvironment = {
+            baseUrl: 'https://unpkg.com/monaco-editor@0.33.0/min/'
+          };
+          importScripts('https://unpkg.com/monaco-editor@0.33.0/min${workerPath}.js');
+        `)}`;
+      }
+    };
+
+    // Load Monaco
     require(['vs/editor/editor.main'], function() {
-      window.monaco = monaco; // Make Monaco globally accessible
+      window.monaco = monaco;
+      window.dispatchEvent(new Event('monaco-ready'));
       console.log('Monaco Editor loaded successfully.');
     });
   </script>
 
-  <!-- Include Renderer Script with type="module" -->
   <script type="module" src="index.js"></script>
 </body>
 </html>
