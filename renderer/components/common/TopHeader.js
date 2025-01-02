@@ -1,4 +1,7 @@
 // renderer/components/common/TopHeader.js
+import AppState from '../../services/state/AppState.js';
+import UserState from '../../services/state/UserState.js';
+
 export default class TopHeader {
     constructor() {
       this.element = null;
@@ -12,6 +15,35 @@ export default class TopHeader {
       
       // Reload the page to return to login
       window.location.reload();
+    }
+
+    createNavButton(text, onClick, variant = 'default') {
+      const button = document.createElement('button');
+      button.className = `nav-button nav-button-${variant}`;
+      button.textContent = text;
+      button.style.cssText = `
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 0.375rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s;
+        background-color: ${variant === 'default' ? '#f3f4f6' : '#4f46e5'};
+        color: ${variant === 'default' ? '#374151' : 'white'};
+        margin-right: 1rem;
+      `;
+
+      button.addEventListener('mouseover', () => {
+        button.style.backgroundColor = variant === 'default' ? '#e5e7eb' : '#4338ca';
+      });
+
+      button.addEventListener('mouseout', () => {
+        button.style.backgroundColor = variant === 'default' ? '#f3f4f6' : '#4f46e5';
+      });
+
+      button.addEventListener('click', onClick);
+      return button;
     }
   
     render() {
@@ -42,15 +74,45 @@ export default class TopHeader {
         align-items: center;
         justify-content: space-between;
       `;
+
+      // Left section for title and navigation
+      const leftSection = document.createElement('div');
+      leftSection.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      `;
   
       // Create title
       const title = document.createElement('h1');
-      title.textContent = 'Exam Application';
+      title.textContent = 'Xamer';
       title.style.cssText = `
         font-size: 1.25rem;
         font-weight: 600;
         color: #1f2937;
+        margin-right: 2rem;
       `;
+
+      leftSection.appendChild(title);
+
+      // Add navigation buttons for teachers
+      if (UserState.isTeacher()) {
+        const dashboardButton = this.createNavButton('Dashboard', () => {
+          AppState.navigateTo('teacherDashboard');
+        });
+
+        const createExamButton = this.createNavButton('Create Exam', () => {
+          AppState.navigateTo('examCreator');
+        }, 'primary');
+
+        const submissionsButton = this.createNavButton('Submissions', () => {
+          AppState.navigateTo('submissionsList');
+        });
+
+        leftSection.appendChild(dashboardButton);
+        leftSection.appendChild(createExamButton);
+        leftSection.appendChild(submissionsButton);
+      }
   
       // Create logout button
       const logoutButton = document.createElement('button');
@@ -88,7 +150,7 @@ export default class TopHeader {
       logoutButton.addEventListener('click', () => this.handleLogout());
   
       // Assemble the header
-      container.appendChild(title);
+      container.appendChild(leftSection);
       container.appendChild(logoutButton);
       header.appendChild(container);
   
@@ -103,4 +165,4 @@ export default class TopHeader {
         this.element = null;
       }
     }
-  }
+}
