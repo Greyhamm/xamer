@@ -20,6 +20,7 @@ exports.protect = asyncHandler(async (req, res, next) => {
   try {
     // Verify token
     const decoded = jwt.verify(token, secret);
+    console.log('Decoded token:', decoded);
 
     // Get user from token
     const user = await User.findById(decoded.userId);
@@ -29,12 +30,15 @@ exports.protect = asyncHandler(async (req, res, next) => {
 
     // Add user to request object
     req.user = {
-      userId: user._id,
-      role: user.role
+      userId: user._id.toString(), // Convert ObjectId to string
+      role: user.role,
+      username: user.username
     };
 
+    console.log('Authenticated user:', req.user);
     next();
   } catch (err) {
+    console.error('Auth error:', err);
     throw new ErrorResponse('Not authorized to access this route', 401);
   }
 });

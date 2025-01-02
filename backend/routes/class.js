@@ -8,6 +8,14 @@ router
   .get(protect, authorize('teacher'), ClassController.getClasses)
   .post(protect, authorize('teacher'), ClassController.createClass);
 
+// Add route for getting a single class
+router.get(
+  '/classes/:classId',
+  protect,
+  authorize('teacher'),
+  ClassController.getClass
+);
+
 router.post(
   '/classes/:classId/exams/:examId',
   protect,

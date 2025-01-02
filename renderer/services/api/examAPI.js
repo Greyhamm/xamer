@@ -18,11 +18,14 @@ class ExamAPI {
 
     static async publishExam(examId) {
         try {
+            console.log('Publishing exam:', examId);
             const response = await window.api.publishExam(examId);
+            console.log('Publish exam response:', response);
+            
             if (!response.success) {
                 throw new Error(response.error || 'Failed to publish exam');
             }
-            return response;  // Return full response object
+            return response;
         } catch (error) {
             console.error('Publish exam error:', error);
             throw error;

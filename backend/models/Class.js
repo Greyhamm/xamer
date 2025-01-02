@@ -29,4 +29,21 @@ const ClassSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
+// Update the pre-find middleware to properly handle the teacher reference
+ClassSchema.pre(/^find/, function(next) {
+  this.populate({
+    path: 'teacher',
+    select: 'username _id'
+  });
+  next();
+});
+
+// Add method to get teacher ID safely
+ClassSchema.methods.getTeacherId = function() {
+  if (this.teacher._id) {
+    return this.teacher._id.toString();
+  }
+  return this.teacher.toString();
+};
+
 module.exports = mongoose.model('Class', ClassSchema);

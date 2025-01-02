@@ -45,9 +45,10 @@ class AppState {
   }
 
   navigateTo(view, params = {}) {
+    console.log('Navigating to:', view, 'with params:', params);
     this.currentView = { name: view, params };
     this.notifyListeners();
-  }
+}
 }
 
 export default new AppState();

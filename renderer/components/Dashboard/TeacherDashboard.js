@@ -4,6 +4,7 @@ import { formatDate } from '../../services/utils/formating.js';
 import AppState from '../../services/state/AppState.js';
 import CreateClassModal from '../class/CreateClassModal.js';
 
+
 export default class TeacherDashboard {
   constructor() {
     this.state = {
@@ -14,7 +15,7 @@ export default class TeacherDashboard {
       error: null
     };
 
-    // Bind all methods in constructor
+    // Bind all methods
     this.loadDashboardData = this.loadDashboardData.bind(this);
     this.updateUI = this.updateUI.bind(this);
     this.render = this.render.bind(this);
@@ -23,18 +24,9 @@ export default class TeacherDashboard {
     this.showCreateClassModal = this.showCreateClassModal.bind(this);
     this.renderClassesSection = this.renderClassesSection.bind(this);
     this.renderStatsCards = this.renderStatsCards.bind(this);
-    // this.renderRecentExams = this.renderRecentExams.bind(this);
 
-    // Initialize the dashboard
+    // Initialize
     this.loadDashboardData();
-  }
-
-  updateUI() {
-    const dashboardContainer = document.querySelector('.teacher-dashboard');
-    if (dashboardContainer) {
-      dashboardContainer.innerHTML = '';
-      dashboardContainer.appendChild(this.render());
-    }
   }
 
   async loadDashboardData() {
@@ -79,12 +71,91 @@ export default class TeacherDashboard {
       if (response.success) {
         await this.loadClasses();
         this.updateUI();
+        return response.data;
       }
     } catch (error) {
       console.error('Failed to create class:', error);
       throw error;
     }
   }
+
+  renderClassesSection() {
+    const section = document.createElement('div');
+    section.className = 'dashboard-section classes-section';
+
+    const header = document.createElement('div');
+    header.className = 'section-header';
+    header.innerHTML = `
+      <h3>Your Classes</h3>
+      <button class="btn btn-primary create-class-btn">Create New Class</button>
+    `;
+
+    header.querySelector('.create-class-btn').addEventListener('click', () => {
+      this.showCreateClassModal();
+    });
+
+    const classesGrid = document.createElement('div');
+    classesGrid.className = 'classes-grid';
+
+    if (!this.state.classes?.length) {
+      const emptyState = document.createElement('div');
+      emptyState.className = 'empty-state';
+      emptyState.innerHTML = `
+        <p>You haven't created any classes yet.</p>
+        <p>Create a class to start organizing your exams!</p>
+      `;
+      classesGrid.appendChild(emptyState);
+    } else {
+      this.state.classes.forEach(classData => {
+        const classCard = document.createElement('div');
+        classCard.className = 'class-card';
+        classCard.innerHTML = `
+          <div class="class-header">
+            <h4>${classData.name}</h4>
+            <p>${classData.description || ''}</p>
+          </div>
+          <div class="class-stats">
+            <div>Students: ${classData.students?.length || 0}</div>
+            <div>Exams: ${classData.exams?.length || 0}</div>
+          </div>
+          <div class="class-actions">
+            <button class="btn btn-primary create-exam-btn" data-class-id="${classData._id}">Create Exam</button>
+            <button class="btn btn-secondary view-exams-btn" data-class-id="${classData._id}">View Exams</button>
+          </div>
+        `;
+
+        // Add event listeners after the card is created
+        const createExamBtn = classCard.querySelector('.create-exam-btn');
+        createExamBtn.addEventListener('click', (e) => {
+            const classId = e.target.dataset.classId;
+            console.log('Creating exam for class:', classId);
+            AppState.navigateTo('examCreator', { classId });
+        });
+
+        const viewExamsBtn = classCard.querySelector('.view-exams-btn');
+        viewExamsBtn.addEventListener('click', (e) => {
+            const classId = e.target.dataset.classId;
+            console.log('Viewing exams for class:', classId);
+            AppState.navigateTo('classView', { classId });
+        });
+
+        classesGrid.appendChild(classCard);
+      });
+    }
+
+    section.appendChild(header);
+    section.appendChild(classesGrid);
+    return section;
+  }
+
+  updateUI() {
+    const dashboardContainer = document.querySelector('.teacher-dashboard');
+    if (dashboardContainer) {
+      dashboardContainer.innerHTML = '';
+      dashboardContainer.appendChild(this.render());
+    }
+  }
+
 
   showCreateClassModal() {
     const modal = document.createElement('div');
@@ -119,6 +190,7 @@ export default class TeacherDashboard {
 
     modal.querySelector('.close-btn').addEventListener('click', closeModal);
     modal.querySelector('.cancel-btn').addEventListener('click', closeModal);
+    
     modal.querySelector('.modal-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const errorMessage = modal.querySelector('.error-message');
@@ -137,6 +209,8 @@ export default class TeacherDashboard {
 
     document.body.appendChild(modal);
   }
+
+
 
   renderStatsCards() {
     const container = document.createElement('div');
@@ -166,67 +240,6 @@ export default class TeacherDashboard {
     return container;
   }
 
-  renderClassesSection() {
-    const section = document.createElement('div');
-    section.className = 'dashboard-section classes-section';
-
-    const header = document.createElement('div');
-    header.className = 'section-header';
-    header.innerHTML = `
-      <h3>Your Classes</h3>
-      <button class="btn btn-primary create-class-btn">
-        Create New Class
-      </button>
-    `;
-
-    header.querySelector('.create-class-btn').addEventListener('click', () => this.showCreateClassModal());
-
-    const classesGrid = document.createElement('div');
-    classesGrid.className = 'classes-grid';
-
-    if (!this.state.classes?.length) {
-      const emptyState = document.createElement('div');
-      emptyState.className = 'empty-state';
-      emptyState.innerHTML = `
-        <p>You haven't created any classes yet.</p>
-        <p>Create a class to start organizing your exams!</p>
-      `;
-      classesGrid.appendChild(emptyState);
-    } else {
-      this.state.classes.forEach(classData => {
-        const classCard = document.createElement('div');
-        classCard.className = 'class-card';
-        classCard.innerHTML = `
-          <div class="class-header">
-            <h4>${classData.name}</h4>
-            <p>${classData.description || ''}</p>
-          </div>
-          <div class="class-stats">
-            <div>Students: ${classData.students?.length || 0}</div>
-            <div>Exams: ${classData.exams?.length || 0}</div>
-          </div>
-          <div class="class-actions">
-            <button class="btn btn-primary create-exam-btn">Create Exam</button>
-            <button class="btn btn-secondary view-exams-btn">View Exams</button>
-          </div>
-        `;
-
-        classCard.querySelector('.create-exam-btn').addEventListener('click', () => {
-          window.location.hash = `#/exam/create/${classData._id}`;
-        });
-
-        classCard.querySelector('.view-exams-btn').addEventListener('click', () => {
-          window.location.hash = `#/class/${classData._id}/exams`;
-        });
-
-        classesGrid.appendChild(classCard);
-      });
-    }
-
-    section.appendChild(header);
-    section.appendChild(classesGrid);
-    return section;
-  }
 
   render() {
     const container = document.createElement('div');
@@ -250,7 +263,6 @@ export default class TeacherDashboard {
 
     container.appendChild(this.renderStatsCards());
     container.appendChild(this.renderClassesSection());
-    // container.appendChild(this.renderRecentExams());
 
     return container;
   }

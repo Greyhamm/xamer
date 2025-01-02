@@ -7,114 +7,149 @@ const QuestionSchema = require('../models/Question');
 const Question = mongoose.model('Question', QuestionSchema);
 const ValidationService = require('../services/ValidationService');
 const ErrorResponse = require('../utils/errorResponse');
-
+const MultipleChoiceQuestion = require('../models/questions/MultipleChoiceQuestion');
+const WrittenQuestion = require('../models/questions/WrittenQuestion');
+const CodingQuestion = require('../models/questions/CodingQuestion');
 class ExamController {
-    // Create new exam
     async createExam(req) {
         try {
-            const { title, questions, userData, classId } = req.body; // Add classId to destructuring
+            const { title, questions, userData, classId, status } = req.body;
+            console.log('Creating exam with data:', { 
+                title,
+                classId,
+                status,
+                userId: userData?.userId 
+            });
             
             if (!title || !questions || !userData) {
                 throw new ErrorResponse('Title, questions, and user data are required', 400);
             }
-
-            // If classId is provided, verify the class exists and user has access
+    
+            // Verify class if classId is provided
+            let classDoc = null;
             if (classId) {
-                const classDoc = await Class.findById(classId);
-                if (!classDoc) {
-                    throw new ErrorResponse('Class not found', 404);
-                }
-                if (classDoc.teacher.toString() !== userData.userId) {
-                    throw new ErrorResponse('Not authorized to create exam for this class', 403);
+                console.log('Looking up class:', classId);
+                try {
+                    classDoc = await Class.findById(classId).populate('teacher', 'username _id');
+                    
+                    if (!classDoc) {
+                        throw new ErrorResponse('Class not found', 404);
+                    }
+    
+                    // Get teacher ID using the safe method or direct access
+                    const teacherId = classDoc.teacher._id.toString();
+                    const requestUserId = userData.userId.toString();
+    
+                    console.log('Auth check:', {
+                        teacherId,
+                        requestUserId,
+                        teacherObjectId: classDoc.teacher._id,
+                        classId: classDoc._id,
+                        className: classDoc.name
+                    });
+    
+                    if (teacherId !== requestUserId) {
+                        throw new ErrorResponse('Not authorized to create exam for this class', 403);
+                    }
+    
+                    console.log('Authorization verified for class:', {
+                        classId: classDoc._id,
+                        className: classDoc.name,
+                        teacherId
+                    });
+                } catch (err) {
+                    console.error('Error during class verification:', err);
+                    if (err.statusCode === 403) {
+                        throw err;
+                    }
+                    throw new ErrorResponse('Error verifying class access', 500);
                 }
             }
     
-            // Validate exam
-            const validationErrors = ValidationService.validateExam({ title, questions });
-            if (validationErrors.length > 0) {
-                throw new ErrorResponse(validationErrors.join(', '), 400);
-            }
-    
-            // Import question models
-            const Question = require('../models/base/BaseQuestion');
-            const MultipleChoiceQuestion = require('../models/questions/MultipleChoiceQuestion');
-            const WrittenQuestion = require('../models/questions/WrittenQuestion');
-            const CodingQuestion = require('../models/questions/CodingQuestion');
-    
-            // Create questions first
-            const questionDocs = await Promise.all(
-                questions.map(async (q) => {
-                    let questionModel;
-                    switch (q.type) {
-                        case 'MultipleChoice':
-                            questionModel = MultipleChoiceQuestion;
-                            break;
-                        case 'Written':
-                            questionModel = WrittenQuestion;
-                            break;
-                        case 'Coding':
-                            questionModel = CodingQuestion;
-                            break;
-                        default:
-                            throw new ErrorResponse(`Unsupported question type: ${q.type}`, 400);
-                    }
-    
-                    const questionData = {
-                        prompt: q.prompt,
-                        type: q.type,
-                        media: q.media
-                    };
-    
-                    // Add type-specific fields
-                    if (q.type === 'MultipleChoice') {
-                        questionData.options = q.options;
-                        questionData.correctOption = q.correctOption;
-                    } else if (q.type === 'Coding') {
-                        questionData.language = q.language;
-                        questionData.initialCode = q.initialCode;
-                    } else if (q.type === 'Written') {
-                        questionData.maxWords = q.maxWords;
-                        questionData.rubric = q.rubric;
-                    }
-    
-                    return await questionModel.create(questionData);
-                })
-            );
-    
-            // Create exam with question references
+            // Create exam data
             const examData = {
                 title,
                 creator: userData.userId,
-                status: req.body.status || 'draft',
-                questions: questionDocs.map(q => q._id),
-                class: classId // Add class reference if provided
+                status: status || 'draft',
+                questions: []
             };
     
-            const exam = await Exam.create(examData);
-
-            // If class is provided, add exam to class
-            if (classId) {
-                await Class.findByIdAndUpdate(classId, {
-                    $push: { exams: exam._id }
-                });
+            // Only add class if we have a valid classDoc
+            if (classDoc) {
+                examData.class = classDoc._id;
+                console.log('Added class reference to exam:', classDoc._id.toString());
             }
     
-            // Populate the exam with question data
-            const populatedExam = await Exam.findById(exam._id)
-                .populate({
-                    path: 'questions',
-                    populate: { path: '_id' }
+            // Create questions
+            console.log('Creating exam questions...');
+            const questionDocs = await Promise.all(
+                questions.map(async (q) => {
+                    const questionModel = mongoose.model(q.type);
+                    const questionData = {
+                        type: q.type,
+                        prompt: q.prompt,
+                        media: q.media,
+                        ...(q.type === 'MultipleChoice' && {
+                            options: q.options,
+                            correctOption: q.correctOption
+                        }),
+                        ...(q.type === 'Coding' && {
+                            language: q.language,
+                            initialCode: q.initialCode
+                        }),
+                        ...(q.type === 'Written' && {
+                            maxWords: q.maxWords,
+                            rubric: q.rubric
+                        })
+                    };
+                    
+                    const createdQuestion = await questionModel.create(questionData);
+                    console.log(`Created ${q.type} question:`, createdQuestion._id);
+                    return createdQuestion;
                 })
+            );
+    
+            examData.questions = questionDocs.map(q => q._id);
+    
+            // Create exam
+            console.log('Creating exam with final data:', {
+                ...examData,
+                questionCount: examData.questions.length,
+                hasClass: !!examData.class
+            });
+    
+            const exam = await Exam.create(examData);
+            console.log('Created exam:', exam._id);
+    
+            // Update class if needed
+            if (classDoc) {
+                console.log('Updating class with exam reference');
+                classDoc.exams.push(exam._id);
+                await classDoc.save();
+            }
+    
+            // Return populated exam
+            const populatedExam = await Exam.findById(exam._id)
+                .populate('questions')
                 .populate('creator', 'username')
-                .populate('class', 'name') // Add class population
+                .populate('class', 'name')
                 .lean();
+    
+            console.log('Returning populated exam:', {
+                id: populatedExam._id,
+                title: populatedExam.title,
+                classId: populatedExam.class?._id,
+                className: populatedExam.class?.name,
+                questionCount: populatedExam.questions.length
+            });
     
             return populatedExam;
         } catch (error) {
             console.error('Create exam error:', error);
-            throw new ErrorResponse(error.message || 'Failed to create exam', 500);
+            throw error;
         }
     }
+
 
     async getStats(req) {
         try {
@@ -189,32 +224,55 @@ class ExamController {
 
     async publishExam(req) {
         try {
-            const examId = req.params.id || req.body.examId;
-            const exam = await Exam.findById(examId);
+            console.log('Publishing exam with data:', req.body);
+            const examId = req.params?.id || req.body?.examId;
+            const userData = req.body?.userData || req.user;
+
+            if (!examId) {
+                throw new ErrorResponse('Exam ID is required', 400);
+            }
+
+            console.log('Looking for exam:', examId);
+            const exam = await Exam.findById(examId)
+                .populate('creator', 'username')
+                .populate('class', 'name');
 
             if (!exam) {
                 throw new ErrorResponse('Exam not found', 404);
             }
 
-            if (exam.creator.toString() !== req.user.userId) {
+            // Compare the creator ID with the user ID
+            const creatorId = exam.creator._id ? exam.creator._id.toString() : exam.creator.toString();
+            const userId = userData.userId.toString();
+
+            console.log('Comparing creator ID:', creatorId, 'with user ID:', userId);
+
+            if (creatorId !== userId) {
                 throw new ErrorResponse('Not authorized to publish this exam', 403);
             }
 
             exam.status = 'published';
             await exam.save();
 
+            console.log('Exam published successfully:', exam);
+
+            // Return populated exam
             const populatedExam = await Exam.findById(exam._id)
                 .populate('questions')
                 .populate('creator', 'username')
                 .populate('class', 'name')
                 .lean();
 
-            return populatedExam;
+            return {
+                success: true,
+                data: populatedExam
+            };
         } catch (error) {
             console.error('Publish exam error:', error);
-            throw new ErrorResponse(error.message || 'Failed to publish exam', 500);
+            throw error;
         }
     }
 }
+
 
 module.exports = { ExamController };

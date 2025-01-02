@@ -40,7 +40,6 @@ class PreloadBridge {
     }
   }
 
-  // Helper to get auth header
   getAuthHeader() {
     const token = localStorage.getItem('token');
     return token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -73,21 +72,27 @@ class PreloadBridge {
     };
 
     try {
-      const response = await fetch(`http://localhost:3000/api${endpoint}`, {
+      const url = `http://localhost:3000/api${endpoint}`;
+      console.log('Making API request to:', url);
+      console.log('Headers:', defaultHeaders);
+
+      const response = await fetch(url, {
         method,
         headers: defaultHeaders,
         body: method !== 'GET' ? JSON.stringify(data) : undefined
       });
 
+      const responseData = await response.json();
+      console.log('API Response:', responseData);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'API request failed');
+        throw new Error(responseData.error || responseData.message || 'API request failed');
       }
 
-      return await response.json();
+      return responseData;
     } catch (error) {
       console.error(`Fetch API Error at ${endpoint}:`, error);
-      throw error;
+      throw new Error(error.message || 'API request failed');
     }
   }
 
@@ -96,9 +101,35 @@ class PreloadBridge {
       signup: (options) => this.fetchApi({ ...options }),
       login: (options) => this.login(options),
       getProfile: () => this.fetchApi({ endpoint: '/auth/profile', method: 'GET' }),
-      createClass: (options) => this.fetchApi({ ...options }),
-      getClasses: () => this.fetchApi({ endpoint: '/classes', method: 'GET' }),
+      
+      // Class related endpoints
+      createClass: (options) => this.fetchApi({
+        endpoint: '/classes',
+        method: 'POST',
+        data: options.data,
+        headers: this.getAuthHeader()
+      }),
+      getClasses: () => this.fetchApi({
+        endpoint: '/classes',
+        method: 'GET',
+        headers: this.getAuthHeader()
+      }),
+      getClass: (options) => this.fetchApi({
+        endpoint: `/classes/${options.classId}`,
+        method: 'GET',
+        headers: this.getAuthHeader()
+      }),
+      addExamToClass: (classId, examId) => this.fetchApi({
+        endpoint: `/classes/${classId}/exams/${examId}`,
+        method: 'POST'
+      }),
+      addStudentToClass: (classId, studentId) => this.fetchApi({
+        endpoint: `/classes/${classId}/students`,
+        method: 'POST',
+        data: { studentId }
+      }),
 
+      // Exam related endpoints
       createExam: async (examData) => {
         console.log('Creating exam, user data:', this.userData);
         if (!this.userData) {
@@ -112,36 +143,36 @@ class PreloadBridge {
 
       getExamStats: async () => {
         try {
-            return await ipcRenderer.invoke('get-exam-stats', { 
-                userData: this.userData || {}
-            });
+          return await ipcRenderer.invoke('get-exam-stats', { 
+            userData: this.userData || {}
+          });
         } catch (error) {
-            console.error('Get exam stats error:', error);
-            return {
-                success: true,
-                data: {
-                    totalExams: 0,
-                    publishedExams: 0,
-                    pendingGrading: 0,
-                    totalSubmissions: 0
-                }
-            };
+          console.error('Get exam stats error:', error);
+          return {
+            success: true,
+            data: {
+              totalExams: 0,
+              publishedExams: 0,
+              pendingGrading: 0,
+              totalSubmissions: 0
+            }
+          };
         }
-    },
+      },
 
-    getRecentExams: async () => {
+      getRecentExams: async () => {
         try {
-            return await ipcRenderer.invoke('get-recent-exams', { 
-                userData: this.userData || {}
-            });
+          return await ipcRenderer.invoke('get-recent-exams', { 
+            userData: this.userData || {}
+          });
         } catch (error) {
-            console.error('Get recent exams error:', error);
-            return {
-                success: true,
-                data: []
-            };
+          console.error('Get recent exams error:', error);
+          return {
+            success: true,
+            data: []
+          };
         }
-    },
+      },
 
       getRecentSubmissions: async () => {
         if (!this.userData) {
@@ -152,41 +183,19 @@ class PreloadBridge {
 
       publishExam: async (examId) => {
         if (!this.userData) {
-            throw new Error('User not authenticated');
+          throw new Error('User not authenticated');
         }
         return await ipcRenderer.invoke('publish-exam', {
-            examId,
-            userData: this.userData
+          examId,
+          userData: this.userData
         });
       },
       
       uploadMedia: async (file) => {
         return await this.uploadMedia(file);
-      },
-
-      createClass: (options) => this.fetchApi({
-        endpoint: '/classes',
-        method: 'POST',
-        data: options.data,
-        headers: this.getAuthHeader()
-      }),
-      
-      getClasses: () => this.fetchApi({
-        endpoint: '/classes',
-        method: 'GET',
-        headers: this.getAuthHeader()
-      }),
-      addExamToClass: (classId, examId) => this.fetchApi({
-        endpoint: `/classes/${classId}/exams/${examId}`,
-        method: 'POST'
-      }),
-      addStudentToClass: (classId, studentId) => this.fetchApi({
-        endpoint: `/classes/${classId}/students`,
-        method: 'POST',
-        data: { studentId }
-      }),
-      });
-    }
+      }
+    });
+  }
 
   async uploadMedia(file) {
     try {
@@ -212,7 +221,6 @@ class PreloadBridge {
       throw error;
     }
   }
-  
 }
 
 // Initialize preload bridge

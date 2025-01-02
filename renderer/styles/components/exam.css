@@ -169,3 +169,36 @@
 .remove-media:hover {
   opacity: 1;
 }
+
+/* Add to your exam.css */
+.class-context {
+  background-color: var(--light-color);
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  color: var(--secondary-color);
+  font-size: 0.875rem;
+}
+
+.class-context {
+  background-color: var(--light-color);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 8px;
+}
+
+.class-context .exam-creator-header {
+  margin: 0 0 0.5rem 0;
+  color: var(--dark-color);
+}
+
+.class-context-info {
+  color: var(--secondary-color);
+  font-size: 0.875rem;
+}
+
+.exam-creator-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}

@@ -1,3 +1,4 @@
+// App.js
 import AppState from './services/state/AppState.js';
 import UserState from './services/state/UserState.js';
 import AuthManager from './components/auth/AuthManager.js';
@@ -39,34 +40,35 @@ export default class App {
     this.renderView(newView);
   }
 
-  async renderView(view) {
+async renderView(view) {
     if (!view) return;
 
     try {
-      // Always render the header if user is logged in
-      if (UserState.getUser()) {
-        // Create and render header
-        this.header = new TopHeader();
-        this.container.appendChild(this.header.render());
-        
-        // Create a wrapper for the main content with padding for fixed header
-        const mainWrapper = document.createElement('div');
-        mainWrapper.style.paddingTop = '64px'; // Account for header height
-        this.container.appendChild(mainWrapper);
+        if (UserState.getUser()) {
+            this.header = new TopHeader();
+            this.container.appendChild(this.header.render());
+            
+            const mainWrapper = document.createElement('div');
+            mainWrapper.style.paddingTop = '64px';
+            this.container.appendChild(mainWrapper);
 
+        
         let component;
+        console.log('Rendering view:', view.name, 'with params:', view.params);
         switch (view.name) {
           case 'auth':
             component = new AuthManager();
+            break;
+          case 'examCreator':
+            component = new ExamCreator({
+              classId: view.params.classId
+            });
             break;
           case 'teacherDashboard':
             component = new TeacherDashboard();
             break;
           case 'studentDashboard':
             component = new StudentDashboard();
-            break;
-          case 'examCreator':
-            component = new ExamCreator();
             break;
           case 'examTaker':
             component = new ExamTaker();
@@ -80,23 +82,27 @@ export default class App {
           case 'submissionsList':
             component = new SubmissionsList();
             break;
+          case 'classView':
+            component = new ClassView(view.params.classId);
+            break;
           default:
             this.showError('Invalid view requested');
             return;
         }
 
-        mainWrapper.appendChild(component.render());
-      } else {
-        // If not logged in, show auth component without header
+   
+        if (component) {
+          mainWrapper.appendChild(component.render());
+      }
+    } else {
         const authManager = new AuthManager();
         this.container.appendChild(authManager.render());
-      }
-    } catch (error) {
-      console.error('Error rendering view:', error);
-      this.showError('Failed to render view');
     }
+  } catch (error) {
+    console.error('Error rendering view:', error);
+    this.showError('Failed to render view');
   }
-
+}
   showError(message) {
     const errorElement = document.createElement('div');
     errorElement.className = 'error-message';

@@ -125,8 +125,9 @@ app.on('window-all-closed', function () {
 });
 
 // IPC Handlers
+// IPC Handlers
 ipcMain.handle('create-exam', ipcAsyncHandler(async (event, data) => {
-  console.log('Create exam data received:', data);
+  console.log('Create exam data received in IPC handler:', data);
   
   if (!data.userData || !data.userData.userId) {
       throw new Error('User not authenticated');
@@ -138,6 +139,7 @@ ipcMain.handle('create-exam', ipcAsyncHandler(async (event, data) => {
               title: data.title,
               questions: data.questions,
               status: data.status,
+              classId: data.classId, // Ensure classId is passed through
               userData: data.userData
           },
           user: {
@@ -146,17 +148,23 @@ ipcMain.handle('create-exam', ipcAsyncHandler(async (event, data) => {
           }
       });
 
+      console.log('Exam creation result:', {
+          id: result._id,
+          title: result.title,
+          classId: result.class?._id,
+          status: result.status
+      });
+
       // Ensure the result is serializable
       return JSON.parse(JSON.stringify(result));
   } catch (error) {
-      console.error('Create exam error:', error);
+      console.error('Create exam error in IPC handler:', error);
       throw error;
   }
 }));
 
 
 
-// Update this section in main.js
 ipcMain.handle('publish-exam', ipcAsyncHandler(async (event, data) => {
   console.log('Publishing exam:', data);
   
@@ -166,10 +174,9 @@ ipcMain.handle('publish-exam', ipcAsyncHandler(async (event, data) => {
 
   try {
       const result = await examController.publishExam({
-          params: { id: data.examId },
-          user: {
-              userId: data.userData.userId,
-              role: data.userData.role
+          body: {
+              examId: data.examId,
+              userData: data.userData
           }
       });
 

@@ -41,30 +41,31 @@ const ExamSchema = new mongoose.Schema({
 
 // Update the populate middleware
 ExamSchema.pre(/^find/, function(next) {
+  console.log('Exam pre-find middleware running, populating fields...');
   this.populate({
     path: 'questions',
     select: '-__v'
-  }).populate({
+  })
+  .populate({
+    path: 'creator',
+    select: 'username'
+  })
+  .populate({
     path: 'class',
-    select: 'name',
-    options: { strictPopulate: false }
+    select: 'name description'
   });
+  
   next();
 });
 
-
-// Calculate total points before saving
-ExamSchema.pre('save', async function(next) {
-  if (this.isModified('questions')) {
-    const Question = mongoose.model('Question');
-    const questions = await Question.find({
-      _id: { $in: this.questions }
-    });
-    
-    this.totalPoints = questions.reduce((total, question) => {
-      return total + (question.points || 0);
-    }, 0);
-  }
+// Add a pre-save middleware to log class information
+ExamSchema.pre('save', function(next) {
+  console.log('Exam pre-save middleware running with data:', {
+    examId: this._id,
+    title: this.title,
+    classId: this.class,
+    status: this.status
+  });
   next();
 });
 
