@@ -9,7 +9,7 @@ import ExamTaker from './components/exam/taking/ExamTaker.js';
 import GradingView from './components/exam/grading/GradingView.js';
 import SubmissionsList from './components/exam/grading/SubmissionsList.js';
 import TopHeader from './components/common/TopHeader.js';
-
+import ClassView from './components/class/ClassView.js';
 export default class App {
   constructor() {
     this.currentView = null;
