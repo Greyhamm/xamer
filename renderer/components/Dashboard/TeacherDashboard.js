@@ -9,36 +9,35 @@ export default class TeacherDashboard {
     this.state = {
       stats: null,
       recentExams: [],
-      recentSubmissions: [],
+      classes: [],
       loading: true,
       error: null
     };
+
+    // Bind all methods in constructor
     this.loadDashboardData = this.loadDashboardData.bind(this);
     this.updateUI = this.updateUI.bind(this);
     this.render = this.render.bind(this);
+    this.loadClasses = this.loadClasses.bind(this);
+    this.createClass = this.createClass.bind(this);
+    this.showCreateClassModal = this.showCreateClassModal.bind(this);
+    this.renderClassesSection = this.renderClassesSection.bind(this);
+    this.renderStatsCards = this.renderStatsCards.bind(this);
+    // this.renderRecentExams = this.renderRecentExams.bind(this);
 
-    // Add listener to ExamState
-    ExamState.addListener(this.onExamStateChange.bind(this));
-
+    // Initialize the dashboard
     this.loadDashboardData();
   }
 
-  onExamStateChange(state) {
-    // Update state based on ExamState changes
-    if (state.stats) {
-      this.state.stats = state.stats;
+  updateUI() {
+    const dashboardContainer = document.querySelector('.teacher-dashboard');
+    if (dashboardContainer) {
+      dashboardContainer.innerHTML = '';
+      dashboardContainer.appendChild(this.render());
     }
-    if (state.recentExams) {
-      this.state.recentExams = state.recentExams;
-    }
-    if (state.recentSubmissions) {
-      this.state.recentSubmissions = state.recentSubmissions;
-    }
-    this.updateUI();
   }
 
   async loadDashboardData() {
-    console.log('Loading dashboard data...');
     try {
       this.state.loading = true;
       this.updateUI();
@@ -46,6 +45,7 @@ export default class TeacherDashboard {
       await Promise.all([
         ExamState.getStats(),
         ExamState.getRecentExams(),
+        this.loadClasses()
       ]);
 
       this.state.loading = false;
@@ -58,18 +58,84 @@ export default class TeacherDashboard {
     }
   }
 
-  setState(newState) {
-    this.state = { ...this.state, ...newState };
-    this.updateUI();
+  async loadClasses() {
+    try {
+      const response = await window.api.getClasses();
+      if (response.success) {
+        this.state.classes = response.data;
+      }
+    } catch (error) {
+      console.error('Failed to load classes:', error);
+      this.state.classes = [];
+    }
   }
 
-  updateUI() {
-    // Re-render the dashboard with the updated state
-    const dashboardContainer = document.querySelector('.teacher-dashboard');
-    if (dashboardContainer) {
-      dashboardContainer.innerHTML = '';
-      dashboardContainer.appendChild(this.render());
+  async createClass(classData) {
+    try {
+      const response = await window.api.createClass({
+        data: classData
+      });
+
+      if (response.success) {
+        await this.loadClasses();
+        this.updateUI();
+      }
+    } catch (error) {
+      console.error('Failed to create class:', error);
+      throw error;
     }
+  }
+
+  showCreateClassModal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.innerHTML = `
+      <div class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>Create New Class</h3>
+            <button class="close-btn">&times;</button>
+          </div>
+          <form class="modal-form">
+            <div class="form-group">
+              <label for="className">Class Name*</label>
+              <input type="text" id="className" required>
+            </div>
+            <div class="form-group">
+              <label for="classDescription">Description</label>
+              <textarea id="classDescription" rows="3"></textarea>
+            </div>
+            <div class="error-message" style="display: none;"></div>
+            <div class="modal-actions">
+              <button type="button" class="btn btn-secondary cancel-btn">Cancel</button>
+              <button type="submit" class="btn btn-primary">Create Class</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    `;
+
+    const closeModal = () => modal.remove();
+
+    modal.querySelector('.close-btn').addEventListener('click', closeModal);
+    modal.querySelector('.cancel-btn').addEventListener('click', closeModal);
+    modal.querySelector('.modal-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errorMessage = modal.querySelector('.error-message');
+      try {
+        const formData = {
+          name: modal.querySelector('#className').value,
+          description: modal.querySelector('#classDescription').value
+        };
+        await this.createClass(formData);
+        closeModal();
+      } catch (error) {
+        errorMessage.textContent = error.message;
+        errorMessage.style.display = 'block';
+      }
+    });
+
+    document.body.appendChild(modal);
   }
 
   renderStatsCards() {
@@ -84,10 +150,10 @@ export default class TeacherDashboard {
     }
 
     const stats = [
-      { label: 'Total Exams', value: this.state.stats.totalExams },
-      { label: 'Published Exams', value: this.state.stats.publishedExams },
-      { label: 'Pending Grades', value: this.state.stats.pendingGrading },
-      { label: 'Total Submissions', value: this.state.stats.totalSubmissions }
+      { label: 'Total Exams', value: this.state.stats.totalExams || 0 },
+      { label: 'Published Exams', value: this.state.stats.publishedExams || 0 },
+      { label: 'Pending Grades', value: this.state.stats.pendingGrading || 0 },
+      { label: 'Total Submissions', value: this.state.stats.totalSubmissions || 0 }
     ];
 
     stats.forEach(stat => {
@@ -100,223 +166,91 @@ export default class TeacherDashboard {
     return container;
   }
 
-  renderRecentExams() {
-    const container = document.createElement('div');
-    container.className = 'recent-exams section';
+  renderClassesSection() {
+    const section = document.createElement('div');
+    section.className = 'dashboard-section classes-section';
 
     const header = document.createElement('div');
     header.className = 'section-header';
     header.innerHTML = `
-      <h3>Recent Exams</h3>
-      <button class="btn btn-primary" id="create-exam-btn">Create New Exam</button>
+      <h3>Your Classes</h3>
+      <button class="btn btn-primary create-class-btn">
+        Create New Class
+      </button>
     `;
 
-    const createExamButton = header.querySelector('#create-exam-btn');
-    createExamButton.addEventListener('click', () => {
-      AppState.navigateTo('examCreator');
-    });
+    header.querySelector('.create-class-btn').addEventListener('click', () => this.showCreateClassModal());
 
-    const examsList = document.createElement('div');
-    examsList.className = 'exams-list';
+    const classesGrid = document.createElement('div');
+    classesGrid.className = 'classes-grid';
 
-    if (!Array.isArray(this.state.recentExams)) {
-      console.error('recentExams is not an array:', this.state.recentExams);
-      const errorMsg = document.createElement('p');
-      errorMsg.textContent = 'Error loading recent exams.';
-      examsList.appendChild(errorMsg);
-    } else if (this.state.recentExams.length === 0) {
-      const noExams = document.createElement('p');
-      noExams.textContent = 'No recent exams found.';
-      examsList.appendChild(noExams);
+    if (!this.state.classes?.length) {
+      const emptyState = document.createElement('div');
+      emptyState.className = 'empty-state';
+      emptyState.innerHTML = `
+        <p>You haven't created any classes yet.</p>
+        <p>Create a class to start organizing your exams!</p>
+      `;
+      classesGrid.appendChild(emptyState);
     } else {
-      this.state.recentExams.forEach(exam => {
-        const examCard = document.createElement('div');
-        examCard.className = 'exam-card';
-        examCard.innerHTML = `
-          <h4>${exam.title}</h4>
-          <p>Status: <span class="status-badge ${exam.status}">${exam.status}</span></p>
-          <p>Questions: ${exam.questions.length}</p>
-          <p>Created: ${formatDate(exam.createdAt)}</p>
-          <div class="card-actions">
-            <button class="btn btn-secondary">View Details</button>
-            ${exam.status === 'draft' ? '<button class="btn btn-primary">Publish</button>' : ''}
+      this.state.classes.forEach(classData => {
+        const classCard = document.createElement('div');
+        classCard.className = 'class-card';
+        classCard.innerHTML = `
+          <div class="class-header">
+            <h4>${classData.name}</h4>
+            <p>${classData.description || ''}</p>
+          </div>
+          <div class="class-stats">
+            <div>Students: ${classData.students?.length || 0}</div>
+            <div>Exams: ${classData.exams?.length || 0}</div>
+          </div>
+          <div class="class-actions">
+            <button class="btn btn-primary create-exam-btn">Create Exam</button>
+            <button class="btn btn-secondary view-exams-btn">View Exams</button>
           </div>
         `;
 
-        const viewButton = examCard.querySelector('.btn-secondary');
-        viewButton.addEventListener('click', () => {
-          AppState.navigateTo('examDetails', { examId: exam._id });
+        classCard.querySelector('.create-exam-btn').addEventListener('click', () => {
+          window.location.hash = `#/exam/create/${classData._id}`;
         });
 
-        const publishButton = examCard.querySelector('.btn-primary');
-        if (publishButton) {
-          publishButton.addEventListener('click', async () => {
-            try {
-              await ExamAPI.publishExam(exam._id);
-              this.loadDashboardData();
-            } catch (error) {
-              alert('Failed to publish exam: ' + error.message);
-            }
-          });
-        }
-
-        examsList.appendChild(examCard);
-      });
-    }
-
-    container.appendChild(header);
-    container.appendChild(examsList);
-    return container;
-  }
-
-  renderRecentSubmissions() {
-    const container = document.createElement('div');
-    container.className = 'recent-submissions section';
-
-    const header = document.createElement('div');
-    header.className = 'section-header';
-    header.innerHTML = `
-      <h3>Recent Submissions</h3>
-      <button class="btn btn-secondary" id="view-all-submissions-btn">View All</button>
-    `;
-
-    const viewAllButton = header.querySelector('#view-all-submissions-btn');
-    viewAllButton.addEventListener('click', () => {
-      AppState.navigateTo('submissionsList');
-    });
-
-    const submissionsList = document.createElement('div');
-    submissionsList.className = 'submissions-list';
-
-    if (!Array.isArray(this.state.recentSubmissions)) {
-      console.error('recentSubmissions is not an array:', this.state.recentSubmissions);
-      const errorMsg = document.createElement('p');
-      errorMsg.textContent = 'Error loading recent submissions.';
-      submissionsList.appendChild(errorMsg);
-    } else if (this.state.recentSubmissions.length === 0) {
-      const noSubmissions = document.createElement('p');
-      noSubmissions.textContent = 'No recent submissions found.';
-      submissionsList.appendChild(noSubmissions);
-    } else {
-      this.state.recentSubmissions.forEach(submission => {
-        const submissionCard = document.createElement('div');
-        submissionCard.className = 'submission-card';
-        submissionCard.innerHTML = `
-          <div class="submission-info">
-            <h4>${submission.exam.title}</h4>
-            <p>Student: ${submission.student.username}</p>
-            <p>Submitted: ${formatDate(submission.submittedAt)}</p>
-            <p>Status: <span class="status-badge ${submission.status}">${submission.status}</span></p>
-          </div>
-          <button class="btn btn-${submission.status === 'graded' ? 'secondary' : 'primary'}">
-            ${submission.status === 'graded' ? 'Review' : 'Grade'}
-          </button>
-        `;
-
-        const actionButton = submissionCard.querySelector('button');
-        actionButton.addEventListener('click', () => {
-          AppState.navigateTo('gradingView', { submissionId: submission._id });
+        classCard.querySelector('.view-exams-btn').addEventListener('click', () => {
+          window.location.hash = `#/class/${classData._id}/exams`;
         });
 
-        submissionsList.appendChild(submissionCard);
+        classesGrid.appendChild(classCard);
       });
     }
 
-    container.appendChild(header);
-    container.appendChild(submissionsList);
-    return container;
+    section.appendChild(header);
+    section.appendChild(classesGrid);
+    return section;
   }
-
-  async loadClasses() {
-    try {
-      const response = await window.api.getClasses();
-      if (response.success) {
-        this.setState({ classes: response.data });
-      }
-    } catch (error) {
-      console.error('Failed to load classes:', error);
-      this.setState({ error: 'Failed to load classes' });
-    }
-  }
-  
-  renderClasses() {
-    const container = document.createElement('div');
-    container.className = 'classes-grid';
-  
-    const createClassBtn = document.createElement('button');
-    createClassBtn.className = 'btn btn-primary create-class-btn';
-    createClassBtn.textContent = 'Create New Class';
-    createClassBtn.addEventListener('click', () => {
-      // Show create class modal/form
-      this.showCreateClassModal();
-    });
-  
-    container.appendChild(createClassBtn);
-  
-    this.state.classes.forEach(classData => {
-      const classCard = new ClassCard(classData, (exam) => {
-        // Handle exam click
-        window.location.hash = `#/exam/${exam._id}`;
-      });
-      container.appendChild(classCard.render());
-    });
-  
-    return container;
-  }
-
-showCreateClassModal() {
-  const createClassModal = new CreateClassModal(
-      () => {
-          // Handle close
-          this.loadClasses(); // Refresh classes list
-      },
-      async (classData) => {
-          // Handle submit
-          try {
-              const response = await window.api.createClass({
-                  endpoint: '/classes',
-                  method: 'POST',
-                  data: classData
-              });
-              
-              if (!response.success) {
-                  throw new Error(response.error || 'Failed to create class');
-              }
-              
-              // Refresh classes list
-              this.loadClasses();
-          } catch (error) {
-              console.error('Create class error:', error);
-              throw error;
-          }
-      }
-  );
-  
-  document.body.appendChild(createClassModal.render());
-}
 
   render() {
     const container = document.createElement('div');
     container.className = 'teacher-dashboard';
 
     if (this.state.loading) {
-      const loading = document.createElement('p');
-      loading.textContent = 'Loading dashboard data...';
+      const loading = document.createElement('div');
+      loading.className = 'loading';
+      loading.textContent = 'Loading dashboard...';
       container.appendChild(loading);
       return container;
     }
 
     if (this.state.error) {
-      const error = document.createElement('p');
+      const error = document.createElement('div');
       error.className = 'error-message';
-      error.textContent = `Error: ${this.state.error}`;
+      error.textContent = this.state.error;
       container.appendChild(error);
       return container;
     }
 
     container.appendChild(this.renderStatsCards());
-    container.appendChild(this.renderRecentExams());
-    container.appendChild(this.renderRecentSubmissions());
+    container.appendChild(this.renderClassesSection());
+    // container.appendChild(this.renderRecentExams());
 
     return container;
   }

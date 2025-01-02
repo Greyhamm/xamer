@@ -163,17 +163,30 @@ class PreloadBridge {
       uploadMedia: async (file) => {
         return await this.uploadMedia(file);
       },
-    addExamToClass: (classId, examId) => this.fetchApi({
-      endpoint: `/classes/${classId}/exams/${examId}`,
-      method: 'POST'
-    }),
-    addStudentToClass: (classId, studentId) => this.fetchApi({
-      endpoint: `/classes/${classId}/students`,
-      method: 'POST',
-      data: { studentId }
-    }),
-    });
-  }
+
+      createClass: (options) => this.fetchApi({
+        endpoint: '/classes',
+        method: 'POST',
+        data: options.data,
+        headers: this.getAuthHeader()
+      }),
+      
+      getClasses: () => this.fetchApi({
+        endpoint: '/classes',
+        method: 'GET',
+        headers: this.getAuthHeader()
+      }),
+      addExamToClass: (classId, examId) => this.fetchApi({
+        endpoint: `/classes/${classId}/exams/${examId}`,
+        method: 'POST'
+      }),
+      addStudentToClass: (classId, studentId) => this.fetchApi({
+        endpoint: `/classes/${classId}/students`,
+        method: 'POST',
+        data: { studentId }
+      }),
+      });
+    }
 
   async uploadMedia(file) {
     try {
