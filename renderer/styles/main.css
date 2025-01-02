@@ -1,4 +1,10 @@
 /* Base styles */
+@import 'components/modal.css';
+@import 'components/auth.css';
+@import 'components/dashboard.css';
+@import 'components/exam.css';
+
+
 :root {
     --primary-color: #4a90e2;
     --secondary-color: #6c757d;

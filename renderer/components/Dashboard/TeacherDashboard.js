@@ -2,6 +2,7 @@ import ExamState from '../../services/state/ExamState.js';
 import SubmissionAPI from '../../services/api/submissionAPI.js';
 import { formatDate } from '../../services/utils/formating.js';
 import AppState from '../../services/state/AppState.js';
+import CreateClassModal from '../class/CreateClassModal.js';
 
 export default class TeacherDashboard {
   constructor() {
@@ -225,6 +226,74 @@ export default class TeacherDashboard {
     container.appendChild(submissionsList);
     return container;
   }
+
+  async loadClasses() {
+    try {
+      const response = await window.api.getClasses();
+      if (response.success) {
+        this.setState({ classes: response.data });
+      }
+    } catch (error) {
+      console.error('Failed to load classes:', error);
+      this.setState({ error: 'Failed to load classes' });
+    }
+  }
+  
+  renderClasses() {
+    const container = document.createElement('div');
+    container.className = 'classes-grid';
+  
+    const createClassBtn = document.createElement('button');
+    createClassBtn.className = 'btn btn-primary create-class-btn';
+    createClassBtn.textContent = 'Create New Class';
+    createClassBtn.addEventListener('click', () => {
+      // Show create class modal/form
+      this.showCreateClassModal();
+    });
+  
+    container.appendChild(createClassBtn);
+  
+    this.state.classes.forEach(classData => {
+      const classCard = new ClassCard(classData, (exam) => {
+        // Handle exam click
+        window.location.hash = `#/exam/${exam._id}`;
+      });
+      container.appendChild(classCard.render());
+    });
+  
+    return container;
+  }
+
+showCreateClassModal() {
+  const createClassModal = new CreateClassModal(
+      () => {
+          // Handle close
+          this.loadClasses(); // Refresh classes list
+      },
+      async (classData) => {
+          // Handle submit
+          try {
+              const response = await window.api.createClass({
+                  endpoint: '/classes',
+                  method: 'POST',
+                  data: classData
+              });
+              
+              if (!response.success) {
+                  throw new Error(response.error || 'Failed to create class');
+              }
+              
+              // Refresh classes list
+              this.loadClasses();
+          } catch (error) {
+              console.error('Create class error:', error);
+              throw error;
+          }
+      }
+  );
+  
+  document.body.appendChild(createClassModal.render());
+}
 
   render() {
     const container = document.createElement('div');

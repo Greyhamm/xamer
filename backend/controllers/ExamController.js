@@ -1,4 +1,6 @@
+// backend/controllers/ExamController.js
 const Exam = require('../models/Exam');
+const Class = require('../models/Class'); // Add this import
 const ExamSubmission = require('../models/ExamSubmission');
 const mongoose = require('mongoose');
 const QuestionSchema = require('../models/Question');
@@ -10,10 +12,21 @@ class ExamController {
     // Create new exam
     async createExam(req) {
         try {
-            const { title, questions, userData } = req.body;
+            const { title, questions, userData, classId } = req.body; // Add classId to destructuring
             
             if (!title || !questions || !userData) {
                 throw new ErrorResponse('Title, questions, and user data are required', 400);
+            }
+
+            // If classId is provided, verify the class exists and user has access
+            if (classId) {
+                const classDoc = await Class.findById(classId);
+                if (!classDoc) {
+                    throw new ErrorResponse('Class not found', 404);
+                }
+                if (classDoc.teacher.toString() !== userData.userId) {
+                    throw new ErrorResponse('Not authorized to create exam for this class', 403);
+                }
             }
     
             // Validate exam
@@ -73,10 +86,18 @@ class ExamController {
                 title,
                 creator: userData.userId,
                 status: req.body.status || 'draft',
-                questions: questionDocs.map(q => q._id)
+                questions: questionDocs.map(q => q._id),
+                class: classId // Add class reference if provided
             };
     
             const exam = await Exam.create(examData);
+
+            // If class is provided, add exam to class
+            if (classId) {
+                await Class.findByIdAndUpdate(classId, {
+                    $push: { exams: exam._id }
+                });
+            }
     
             // Populate the exam with question data
             const populatedExam = await Exam.findById(exam._id)
@@ -85,7 +106,8 @@ class ExamController {
                     populate: { path: '_id' }
                 })
                 .populate('creator', 'username')
-                .lean(); // Convert to plain JavaScript object
+                .populate('class', 'name') // Add class population
+                .lean();
     
             return populatedExam;
         } catch (error) {
@@ -93,38 +115,75 @@ class ExamController {
             throw new ErrorResponse(error.message || 'Failed to create exam', 500);
         }
     }
+
     async getStats(req) {
         try {
-            const stats = await Promise.all([
-                Exam.countDocuments({ creator: req.user.userId }),
-                Exam.countDocuments({ creator: req.user.userId, status: 'published' }),
+            const userId = req.user?.userId || req.body?.userData?.userId;
+            if (!userId) {
+                // Return default stats if no user ID
+                return {
+                    totalExams: 0,
+                    publishedExams: 0,
+                    pendingGrading: 0,
+                    totalSubmissions: 0
+                };
+            }
+    
+            let query = { creator: userId };
+            const classId = req.query?.classId;
+            if (classId) {
+                query.class = classId;
+            }
+    
+            const [totalExams, publishedExams, submittedExams, totalSubmissions] = await Promise.all([
+                Exam.countDocuments(query),
+                Exam.countDocuments({ ...query, status: 'published' }),
                 ExamSubmission.countDocuments({ status: 'submitted' }),
                 ExamSubmission.countDocuments()
             ]);
-
+    
             return {
-                totalExams: stats[0],
-                publishedExams: stats[1],
-                pendingGrading: stats[2],
-                totalSubmissions: stats[3]
+                totalExams: totalExams || 0,
+                publishedExams: publishedExams || 0,
+                pendingGrading: submittedExams || 0,
+                totalSubmissions: totalSubmissions || 0
             };
         } catch (error) {
-            throw new ErrorResponse('Failed to fetch exam statistics', 500);
+            console.error('Get stats error:', error);
+            // Return default stats on error
+            return {
+                totalExams: 0,
+                publishedExams: 0,
+                pendingGrading: 0,
+                totalSubmissions: 0
+            };
         }
     }
-
+    
     async getRecentExams(req) {
         try {
-            const recentExams = await Exam.find({ creator: req.user.userId })
+            const userId = req.user?.userId || req.body?.userData?.userId;
+            if (!userId) {
+                return [];
+            }
+    
+            let query = { creator: userId };
+            const classId = req.query?.classId;
+            if (classId) {
+                query.class = classId;
+            }
+    
+            const recentExams = await Exam.find(query)
                 .sort({ createdAt: -1 })
                 .limit(5)
                 .populate('creator', 'username')
                 .populate('questions')
-                .lean(); // Convert to plain JavaScript object
-
-            return recentExams;
+                .lean();
+    
+            return recentExams || [];
         } catch (error) {
-            throw new ErrorResponse('Failed to fetch recent exams', 500);
+            console.error('Get recent exams error:', error);
+            return [];
         }
     }
 
@@ -147,7 +206,8 @@ class ExamController {
             const populatedExam = await Exam.findById(exam._id)
                 .populate('questions')
                 .populate('creator', 'username')
-                .lean(); // Convert to plain JavaScript object
+                .populate('class', 'name')
+                .lean();
 
             return populatedExam;
         } catch (error) {

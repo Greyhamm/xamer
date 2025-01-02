@@ -12,7 +12,7 @@ const authRoutes = require('../backend/routes/auth');
 const ipcAsyncHandler = require('../backend/utils/ipcAsyncHandler');
 const dotenv = require('dotenv');
 dotenv.config();
-
+const classRoutes = require('../backend/routes/class');
 // Import controllers
 const { ExamController } = require('../backend/controllers/ExamController');
 const examController = new ExamController();
@@ -43,6 +43,7 @@ expressApp.use('/api/auth', authRoutes);
 expressApp.use('/api', examRoutes);
 expressApp.use('/api', codeExecutionRoutes);
 expressApp.use('/api/media', mediaRoutes); 
+expressApp.use('/api', classRoutes);
 
 // Serve static files from uploads directory
 expressApp.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
@@ -153,18 +154,7 @@ ipcMain.handle('create-exam', ipcAsyncHandler(async (event, data) => {
   }
 }));
 
-ipcMain.handle('get-exam-stats', ipcAsyncHandler(async (event, data) => {
-  if (!data.userData || !data.userData.userId) {
-    throw new Error('User not authenticated');
-  }
 
-  return await examController.getStats({
-    user: {
-      userId: data.userData.userId,
-      role: data.userData.role
-    }
-  });
-}));
 
 // Update this section in main.js
 ipcMain.handle('publish-exam', ipcAsyncHandler(async (event, data) => {
@@ -227,12 +217,30 @@ ipcMain.handle('get-exam-by-id', ipcAsyncHandler(async (event, examId) => {
 
 
 
-ipcMain.handle('get-recent-exams', ipcAsyncHandler(async (event) => {
-  console.log('Fetching recent exams for user:', event.sender.userId);
+ipcMain.handle('get-exam-stats', ipcAsyncHandler(async (event, data) => {
+  // Ensure we have userData
+  if (!data?.userData) {
+    throw new ErrorResponse('User data is required', 401);
+  }
+
+  return await examController.getStats({
+    user: {
+      userId: data.userData.userId,
+      role: data.userData.role
+    }
+  });
+}));
+
+ipcMain.handle('get-recent-exams', ipcAsyncHandler(async (event, data) => {
+  // Ensure we have userData
+  if (!data?.userData) {
+    throw new ErrorResponse('User data is required', 401);
+  }
+
   return await examController.getRecentExams({
     user: {
-      userId: event.sender.userId,
-      role: event.sender.role
+      userId: data.userData.userId,
+      role: data.userData.role
     }
   });
 }));

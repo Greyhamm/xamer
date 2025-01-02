@@ -105,3 +105,75 @@
       flex-direction: column;
     }
   }
+
+  /* Add to renderer/styles/components/dashboard.css */
+.classes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.class-card {
+  background: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease;
+}
+
+.class-card:hover {
+  transform: translateY(-2px);
+}
+
+.class-header {
+  margin-bottom: 1rem;
+}
+
+.class-header h3 {
+  font-size: 1.25rem;
+  color: var(--dark-color);
+  margin-bottom: 0.5rem;
+}
+
+.class-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  color: var(--secondary-color);
+  font-size: 0.875rem;
+}
+
+.class-exams {
+  margin: 1rem 0;
+}
+
+.exams-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.exam-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.exam-item:hover {
+  background-color: var(--light-color);
+}
+
+.class-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.create-class-btn {
+  width: 100%;
+  margin-bottom: 1rem;
+}

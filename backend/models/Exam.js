@@ -11,6 +11,11 @@ const ExamSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  class: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Class',
+    default: null
+  },
   questions: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Question'
@@ -26,7 +31,7 @@ const ExamSchema = new mongoose.Schema({
   },
   timeLimit: {
     type: Number,
-    default: null // Time limit in minutes, null means no limit
+    default: null
   }
 }, {
   timestamps: true,
@@ -34,14 +39,20 @@ const ExamSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Populate questions based on their types
+// Update the populate middleware
 ExamSchema.pre(/^find/, function(next) {
   this.populate({
     path: 'questions',
     select: '-__v'
+  }).populate({
+    path: 'class',
+    select: 'name',
+    options: { strictPopulate: false }
   });
   next();
 });
+
+
 // Calculate total points before saving
 ExamSchema.pre('save', async function(next) {
   if (this.isModified('questions')) {

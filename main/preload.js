@@ -96,6 +96,8 @@ class PreloadBridge {
       signup: (options) => this.fetchApi({ ...options }),
       login: (options) => this.login(options),
       getProfile: () => this.fetchApi({ endpoint: '/auth/profile', method: 'GET' }),
+      createClass: (options) => this.fetchApi({ ...options }),
+      getClasses: () => this.fetchApi({ endpoint: '/classes', method: 'GET' }),
 
       createExam: async (examData) => {
         console.log('Creating exam, user data:', this.userData);
@@ -109,18 +111,37 @@ class PreloadBridge {
       },
 
       getExamStats: async () => {
-        if (!this.userData) {
-          throw new Error('User not authenticated');
+        try {
+            return await ipcRenderer.invoke('get-exam-stats', { 
+                userData: this.userData || {}
+            });
+        } catch (error) {
+            console.error('Get exam stats error:', error);
+            return {
+                success: true,
+                data: {
+                    totalExams: 0,
+                    publishedExams: 0,
+                    pendingGrading: 0,
+                    totalSubmissions: 0
+                }
+            };
         }
-        return await ipcRenderer.invoke('get-exam-stats', { userData: this.userData });
-      },
+    },
 
-      getRecentExams: async () => {
-        if (!this.userData) {
-          throw new Error('User not authenticated');
+    getRecentExams: async () => {
+        try {
+            return await ipcRenderer.invoke('get-recent-exams', { 
+                userData: this.userData || {}
+            });
+        } catch (error) {
+            console.error('Get recent exams error:', error);
+            return {
+                success: true,
+                data: []
+            };
         }
-        return await ipcRenderer.invoke('get-recent-exams', { userData: this.userData });
-      },
+    },
 
       getRecentSubmissions: async () => {
         if (!this.userData) {
@@ -142,6 +163,15 @@ class PreloadBridge {
       uploadMedia: async (file) => {
         return await this.uploadMedia(file);
       },
+    addExamToClass: (classId, examId) => this.fetchApi({
+      endpoint: `/classes/${classId}/exams/${examId}`,
+      method: 'POST'
+    }),
+    addStudentToClass: (classId, studentId) => this.fetchApi({
+      endpoint: `/classes/${classId}/students`,
+      method: 'POST',
+      data: { studentId }
+    }),
     });
   }
 
