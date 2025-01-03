@@ -204,32 +204,29 @@ class PreloadBridge {
       },
 
 
-
-      searchStudents : (options) => this.fetchApi({
+        // Update student management endpoints
+      searchStudents: (options) => this.fetchApi({
         endpoint: `/classes/${options.classId}/search-students?query=${encodeURIComponent(options.data.query)}`,
         method: 'GET',
-        headers: this.getAuthHeader()  // Ensure we're passing auth headers
+        headers: this.getAuthHeader()
       }),
 
-
       addStudentToClass: (classId, studentId) => this.fetchApi({
-        endpoint: `/classes/${classId}/students`,
-        method: 'POST',
-        data: { studentId },
-        headers: {
-            'Content-Type': 'application/json',
-            ...this.getAuthHeader()
-        }
-    }),
+          endpoint: `/classes/${classId}/students`,
+          method: 'POST',
+          data: { studentId },
+          headers: {
+              'Content-Type': 'application/json',
+              ...this.getAuthHeader()
+          }
+      }),
 
-    removeStudentFromClass: (classId, studentId) => this.fetchApi({
-      endpoint: `/classes/${classId}/students/${studentId}`,
-      method: 'DELETE',
-      headers: this.getAuthHeader()
-    }),
-    
-  
-    });
+      removeStudentFromClass: (classId, studentId) => this.fetchApi({
+          endpoint: `/classes/${classId}/students/${studentId}`,
+          method: 'DELETE',
+          headers: this.getAuthHeader()
+      })
+  });
   }
 
   async uploadMedia(file) {

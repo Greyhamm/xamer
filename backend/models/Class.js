@@ -29,21 +29,45 @@ const ClassSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Update the pre-find middleware to properly handle the teacher reference
+// Track population state using query options
 ClassSchema.pre(/^find/, function(next) {
+  // Skip if this is a nested population
+  if (this.options?._recursed) {
+    return next();
+  }
+
+  // Mark as recursed to prevent infinite loops
+  this.options._recursed = true;
+
   this.populate({
     path: 'teacher',
     select: 'username _id'
   });
+
+  this.populate({
+    path: 'students',
+    select: 'username email createdAt'
+  });
+
+  // Only populate basic exam info without class reference
+  this.populate({
+    path: 'exams',
+    select: 'title status creator',
+    options: { _recursed: true }
+  });
+
   next();
 });
 
-// Add method to get teacher ID safely
-ClassSchema.methods.getTeacherId = function() {
-  if (this.teacher._id) {
-    return this.teacher._id.toString();
-  }
-  return this.teacher.toString();
-};
+
+// Pre-save middleware for logging
+ClassSchema.pre('save', function(next) {
+  console.log('Class pre-save middleware running:', {
+    classId: this._id,
+    name: this.name,
+    studentCount: this.students?.length || 0
+  });
+  next();
+});
 
 module.exports = mongoose.model('Class', ClassSchema);

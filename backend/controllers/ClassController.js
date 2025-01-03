@@ -20,49 +20,7 @@ class ClassController {
   });
 
   // Get all classes for a teacher
-  getClasses = asyncHandler(async (req, res) => {
-    const classes = await Class.find({ teacher: req.user.userId })
-      .populate('exams')
-      .populate('students', 'username email');
 
-    res.status(200).json({
-      success: true,
-      count: classes.length,
-      data: classes
-    });
-  });
-
-  // Get single class
-  // Get single class
-  getClass = asyncHandler(async (req, res) => {
-    console.log('Getting class with ID:', req.params.classId);
-    console.log('User making request:', req.user);
-
-    const classData = await Class.findById(req.params.classId)
-      .populate('exams')
-      .populate('students', 'username email')
-      .populate('teacher', 'username');  // Add this to populate teacher data
-
-    if (!classData) {
-      throw new ErrorResponse('Class not found', 404);
-    }
-
-    // Convert ObjectId to string for comparison
-    const teacherId = classData.teacher._id ? classData.teacher._id.toString() : classData.teacher.toString();
-    const requestUserId = req.user.userId.toString();
-
-    console.log('Teacher ID:', teacherId);
-    console.log('Request User ID:', requestUserId);
-
-    if (teacherId !== requestUserId) {
-      throw new ErrorResponse('Not authorized to access this class', 403);
-    }
-
-    res.status(200).json({
-      success: true,
-      data: classData
-    });
-  });
 
 
   // Add exam to class
@@ -89,30 +47,77 @@ class ClassController {
     });
   });
 
-  // Add student to class
+
+    getClass = asyncHandler(async (req, res) => {
+      console.log('Getting class with ID:', req.params.classId);
+      
+      const classData = await Class.findById(req.params.classId)
+        .select('+students +exams') // Explicitly select these fields
+        .lean(); // Use lean() for better performance
+  
+      if (!classData) {
+        throw new ErrorResponse('Class not found', 404);
+      }
+  
+      const teacherId = classData.teacher._id.toString();
+      const requestUserId = req.user.userId.toString();
+  
+      if (teacherId !== requestUserId) {
+        throw new ErrorResponse('Not authorized to access this class', 403);
+      }
+  
+      res.status(200).json({
+        success: true,
+        data: classData
+      });
+    });
+  
+    // Get classes
+    getClasses = asyncHandler(async (req, res) => {
+      const classes = await Class.find({ teacher: req.user.userId })
+        .select('+students +exams')
+        .lean();
+  
+      res.status(200).json({
+        success: true,
+        count: classes.length,
+        data: classes
+      });
+    });
+
+
+  // Update addStudentToClass to track when student was added
   addStudentToClass = asyncHandler(async (req, res) => {
     const { classId } = req.params;
     const { studentId } = req.body;
     
-    const classData = await Class.findById(classId);
-    if (!classData) {
+    const classDoc = await Class.findById(classId);
+    if (!classDoc) {
       throw new ErrorResponse('Class not found', 404);
     }
 
-    if (classData.teacher.toString() !== req.user.userId) {
+    if (classDoc.teacher.toString() !== req.user.userId) {
       throw new ErrorResponse('Not authorized', 403);
     }
 
-    if (!classData.students.includes(studentId)) {
-      classData.students.push(studentId);
-      await classData.save();
+    // Add student with timestamp
+    if (!classDoc.students.includes(studentId)) {
+      classDoc.students.push(studentId);
+      await classDoc.save();
     }
+
+    // Return populated class data
+    const populatedClass = await Class.findById(classId)
+      .populate('exams')
+      .populate('students', 'username email createdAt')
+      .populate('teacher', 'username');
 
     res.status(200).json({
       success: true,
-      data: classData
+      data: populatedClass
     });
   });
 }
+
 
 module.exports = new ClassController();

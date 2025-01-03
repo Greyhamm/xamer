@@ -6,38 +6,35 @@ export default class ClassView {
             classId,
             classData: null,
             loading: true,
-            error: null
+            error: null,
+            removeInProgress: new Set() // Initialize the Set properly
         };
         this.loadClassData();
     }
 
-
-    formatDate(dateString) {
-        if (!dateString) return 'N/A';
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) return 'N/A';
-        return date.toLocaleDateString();
-    }
-
-    async removeStudent(studentId) {
-        try {
-            await window.api.removeStudentFromClass(this.state.classId, studentId);
-            await this.loadClassData(); // Refresh the view
-        } catch (error) {
-            console.error('Failed to remove student:', error);
-            // You might want to show an error message to the user here
-        }
-    }
-    
     async loadClassData() {
         try {
+            this.setState({ loading: true, error: null });
+            
             const response = await window.api.getClass({ classId: this.state.classId });
-            if (response.success) {
-                this.setState({
-                    classData: response.data,
-                    loading: false
-                });
+            
+            if (!response.success) {
+                throw new Error(response.error || 'Failed to load class data');
             }
+
+            // Ensure all required arrays exist
+            const classData = {
+                ...response.data,
+                students: response.data.students || [],
+                exams: response.data.exams || []
+            };
+
+            this.setState({
+                classData,
+                loading: false,
+                error: null
+            });
+
         } catch (error) {
             console.error('Failed to load class data:', error);
             this.setState({
@@ -48,9 +45,73 @@ export default class ClassView {
     }
 
     setState(newState) {
-        this.state = { ...this.state, ...newState };
+        this.state = { 
+            ...this.state, 
+            ...newState,
+            removeInProgress: this.state.removeInProgress || new Set() // Preserve the Set during state updates
+        };
         this.updateUI();
     }
+
+    async removeStudent(studentId) {
+        try {
+            // Set removal in progress
+            this.state.removeInProgress.add(studentId);
+            this.updateUI();
+    
+            console.log('Removing student:', studentId, 'from class:', this.state.classId);
+            
+            const response = await window.api.removeStudentFromClass(
+                this.state.classId, 
+                studentId
+            );
+    
+            console.log('Remove student response:', response);
+    
+            if (!response.success) {
+                throw new Error(response.error || 'Failed to remove student');
+            }
+    
+            // Update the local state with the new class data from response
+            this.setState({
+                classData: response.data,
+                error: null
+            });
+            
+            // Remove from in-progress set
+            this.state.removeInProgress.delete(studentId);
+            this.updateUI();
+    
+        } catch (error) {
+            console.error('Failed to remove student:', error);
+            this.state.removeInProgress.delete(studentId);
+            this.setState({
+                error: `Failed to remove student: ${error.message}`
+            });
+        }
+    }
+
+
+    formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return 'N/A';
+            
+            // Format date with more details
+            return new Intl.DateTimeFormat('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }).format(date);
+        } catch (error) {
+            console.error('Error formatting date:', error);
+            return 'N/A';
+        }
+    }
+
 
     updateUI() {
         if (!this.container) return;
@@ -114,7 +175,9 @@ export default class ClassView {
         const examGrid = document.createElement('div');
         examGrid.className = 'exam-grid';
 
-        if (!this.state.classData.exams?.length) {
+        const exams = this.state.classData?.exams || [];
+
+        if (!exams.length) {
             examGrid.innerHTML = `
                 <div class="empty-state">
                     <p>No exams have been created yet</p>
@@ -122,27 +185,27 @@ export default class ClassView {
                 </div>
             `;
         } else {
-            this.state.classData.exams.forEach(exam => {
+            exams.forEach(exam => {
                 const examCard = document.createElement('div');
                 examCard.className = 'exam-card';
                 examCard.innerHTML = `
                     <div class="exam-card-header">
-                        <h3>${exam.title}</h3>
-                        <span class="status-badge ${exam.status}">${exam.status}</span>
+                        <h3>${exam?.title || 'Untitled Exam'}</h3>
+                        <span class="status-badge ${exam?.status || 'draft'}">${exam?.status || 'draft'}</span>
                     </div>
                     <div class="exam-card-stats">
                         <div class="stat">
                             <span class="label">Questions:</span>
-                            <span class="value">${exam.questions.length}</span>
+                            <span class="value">${exam?.questions?.length || 0}</span>
                         </div>
                         <div class="stat">
                             <span class="label">Created:</span>
-                            <span class="value">${new Date(exam.createdAt).toLocaleDateString()}</span>
+                            <span class="value">${exam?.createdAt ? new Date(exam.createdAt).toLocaleDateString() : 'N/A'}</span>
                         </div>
                     </div>
                     <div class="exam-card-actions">
                         <button class="btn btn-secondary view-btn">View Details</button>
-                        ${exam.status === 'draft' ? 
+                        ${exam?.status === 'draft' ? 
                             '<button class="btn btn-primary publish-btn">Publish</button>' : 
                             '<button class="btn btn-secondary submissions-btn">View Submissions</button>'}
                     </div>
@@ -171,6 +234,7 @@ export default class ClassView {
         return section;
     }
 
+
     renderStudentsSection() {
         const section = document.createElement('div');
         section.className = 'dashboard-section students-section';
@@ -185,21 +249,12 @@ export default class ClassView {
             <p class="section-description">Manage enrolled students and their progress</p>
         `;
 
-        // Add student button handler
-        header.querySelector('.add-student-btn').addEventListener('click', () => {
-            const addStudentsModal = new AddStudentsModal({
-                classId: this.state.classId,
-                onSubmit: async (addedStudents) => {
-                    await this.loadClassData();
-                }
-            });
-            document.body.appendChild(addStudentsModal.render());
-        });
-
         const studentsList = document.createElement('div');
         studentsList.className = 'students-list';
 
-        if (!this.state.classData.students?.length) {
+        const students = this.state.classData?.students || [];
+
+        if (!students.length) {
             studentsList.innerHTML = `
                 <div class="empty-state">
                     <p>No students enrolled yet</p>
@@ -218,17 +273,18 @@ export default class ClassView {
                         </tr>
                     </thead>
                     <tbody>
-                        ${this.state.classData.students.map(student => `
+                        ${students.map(student => `
                             <tr data-student-id="${student._id}">
-                                <td>${student.username}</td>
-                                <td>${student.email}</td>
-                                <td>${this.formatDate(student.createdAt)}</td>
+                                <td>${student?.username || 'N/A'}</td>
+                                <td>${student?.email || 'N/A'}</td>
+                                <td>${student?.createdAt ? this.formatDate(student.createdAt) : 'N/A'}</td>
                                 <td class="action-buttons">
                                     <button class="btn btn-secondary btn-sm view-progress-btn">
                                         View Progress
                                     </button>
-                                    <button class="btn btn-danger btn-sm remove-student-btn">
-                                        Remove
+                                    <button class="btn btn-danger btn-sm remove-student-btn" 
+                                        ${this.state.removeInProgress.has(student._id) ? 'disabled' : ''}>
+                                        ${this.state.removeInProgress.has(student._id) ? 'Removing...' : 'Remove'}
                                     </button>
                                 </td>
                             </tr>
@@ -237,22 +293,37 @@ export default class ClassView {
                 </table>
             `;
 
-            // Add event listeners for remove buttons
+            // Add event listeners for buttons
             const tbody = studentsList.querySelector('tbody');
-            tbody.addEventListener('click', async (e) => {
-                const button = e.target.closest('button');
-                if (!button) return;
+            if (tbody) {
+                tbody.addEventListener('click', async (e) => {
+                    const button = e.target.closest('button');
+                    if (!button || button.disabled) return;
 
-                const row = button.closest('tr');
-                const studentId = row.dataset.studentId;
+                    const row = button.closest('tr');
+                    if (!row) return;
 
-                if (button.classList.contains('remove-student-btn')) {
-                    if (confirm('Are you sure you want to remove this student from the class?')) {
-                        await this.removeStudent(studentId);
+                    const studentId = row.dataset.studentId;
+                    if (!studentId) return;
+
+                    if (button.classList.contains('remove-student-btn')) {
+                        if (confirm('Are you sure you want to remove this student from the class?')) {
+                            await this.removeStudent(studentId);
+                        }
                     }
+                });
+            }
+        }
+
+        header.querySelector('.add-student-btn')?.addEventListener('click', () => {
+            const addStudentsModal = new AddStudentsModal({
+                classId: this.state.classId,
+                onSubmit: async () => {
+                    await this.loadClassData();
                 }
             });
-        }
+            document.body.appendChild(addStudentsModal.render());
+        });
 
         section.appendChild(header);
         section.appendChild(studentsList);
@@ -273,18 +344,7 @@ export default class ClassView {
                 <div class="error-message">${this.state.error}</div>
                 <button class="btn btn-primary back-btn">Back to Dashboard</button>
             `;
-            this.container.querySelector('.back-btn').addEventListener('click', () => {
-                AppState.navigateTo('teacherDashboard');
-            });
-            return this.container;
-        }
-
-        if (!this.state.classData) {
-            this.container.innerHTML = `
-                <div class="error-message">Class not found</div>
-                <button class="btn btn-primary back-btn">Back to Dashboard</button>
-            `;
-            this.container.querySelector('.back-btn').addEventListener('click', () => {
+            this.container.querySelector('.back-btn')?.addEventListener('click', () => {
                 AppState.navigateTo('teacherDashboard');
             });
             return this.container;

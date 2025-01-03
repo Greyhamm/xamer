@@ -149,17 +149,21 @@ router.get(
     })
 );
 
-// Add to backend/routes/class.js
 
+// Updated backend/routes/class.js
 router.delete(
   '/classes/:classId/students/:studentId',
   protect,
   authorize('teacher'),
   asyncHandler(async (req, res) => {
       const { classId, studentId } = req.params;
+      console.log('Removing student from class:', { classId, studentId });
 
+      // Find the class and populate it
       const classDoc = await Class.findById(classId)
-          .populate('teacher');
+          .populate('teacher')
+          .populate('students')
+          .populate('exams');
 
       if (!classDoc) {
           throw new ErrorResponse('Class not found', 404);
@@ -171,16 +175,36 @@ router.delete(
           throw new ErrorResponse('Not authorized to modify this class', 403);
       }
 
-      // Remove student from class
-      classDoc.students = classDoc.students.filter(
-          student => student.toString() !== studentId
+      // Remove student from the students array
+      const studentIndex = classDoc.students.findIndex(
+          student => student._id.toString() === studentId
       );
+
+      if (studentIndex === -1) {
+          throw new ErrorResponse('Student not found in class', 404);
+      }
+
+      // Remove the student
+      classDoc.students.splice(studentIndex, 1);
       
+      // Save the updated class
       await classDoc.save();
+
+      // Fetch the updated class with populated fields
+      const updatedClass = await Class.findById(classId)
+          .populate('teacher')
+          .populate('students')
+          .populate('exams');
+
+      console.log('Student removed successfully:', {
+          classId,
+          studentId,
+          remainingStudents: updatedClass.students.length
+      });
 
       res.status(200).json({
           success: true,
-          data: classDoc
+          data: updatedClass
       });
   })
 );

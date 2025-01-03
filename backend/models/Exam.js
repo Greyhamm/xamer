@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+mongoose = require('mongoose');
 
 const ExamSchema = new mongoose.Schema({
   title: { 
@@ -39,22 +39,33 @@ const ExamSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Update the populate middleware
+// Track population state using query options
 ExamSchema.pre(/^find/, function(next) {
-  console.log('Exam pre-find middleware running, populating fields...');
+  // Skip if this is a nested population
+  if (this.options?._recursed) {
+    return next();
+  }
+
+  // Mark as recursed to prevent infinite loops
+  this.options._recursed = true;
+
   this.populate({
     path: 'questions',
     select: '-__v'
-  })
-  .populate({
+  });
+
+  this.populate({
     path: 'creator',
     select: 'username'
-  })
-  .populate({
-    path: 'class',
-    select: 'name description'
   });
-  
+
+  // Only populate basic class info without its exams
+  this.populate({
+    path: 'class',
+    select: 'name description teacher',
+    options: { _recursed: true }
+  });
+
   next();
 });
 
