@@ -93,32 +93,50 @@ export default class AddStudentsModal {
         this.setState({ selectedStudents });
     }
 
-    async handleSubmit(e) {
-        e.preventDefault();
-        
-        if (this.state.selectedStudents.length === 0) {
-            this.setState({ error: 'Please select at least one student' });
-            return;
-        }
+// Update in AddStudentsModal.js
 
-        try {
-            this.setState({ loading: true, error: null });
-            
-            // Add each selected student to the class
-            await Promise.all(
-                this.state.selectedStudents.map(student =>
-                    window.api.addStudentToClass(this.classId, student._id)
-                )
-            );
-
-            this.onSubmit?.(this.state.selectedStudents);
-            this.close();
-        } catch (error) {
-            this.setState({ error: 'Failed to add students to class' });
-        } finally {
-            this.setState({ loading: false });
-        }
+async handleSubmit(e) {
+    e.preventDefault();
+    
+    if (this.state.selectedStudents.length === 0) {
+        this.setState({ error: 'Please select at least one student' });
+        return;
     }
+
+    try {
+        this.setState({ loading: true, error: null });
+        
+        // Add students one by one
+        const results = await Promise.all(
+            this.state.selectedStudents.map(student =>
+                window.api.addStudentToClass(this.classId, student._id)
+                    .catch(err => {
+                        console.error(`Failed to add student ${student.username}:`, err);
+                        return { error: err, student };
+                    })
+            )
+        );
+
+        // Check for any errors
+        const errors = results.filter(r => r.error);
+        if (errors.length > 0) {
+            const errorMessage = errors.map(e => 
+                `Failed to add ${e.student.username}: ${e.error.message}`
+            ).join('\n');
+            throw new Error(errorMessage);
+        }
+
+        // Notify parent component of success
+        this.onSubmit?.(this.state.selectedStudents);
+        this.close();
+    } catch (error) {
+        console.error('Submit error:', error);
+        this.setState({ 
+            error: error.message || 'Failed to add students to class',
+            loading: false 
+        });
+    }
+}
 
     updateUI() {
         // Update search results

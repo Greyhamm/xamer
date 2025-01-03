@@ -27,12 +27,62 @@ router.post(
   ClassController.addExamToClass
 );
 
-// router.post(
-//   '/classes/:classId/students',
-//   protect,
-//   authorize('teacher'),
-//   ClassController.addStudentToClass
-// );
+
+router.post(
+  '/classes/:classId/students',
+  protect,
+  authorize('teacher'),
+  asyncHandler(async (req, res) => {
+      const { classId } = req.params;
+      const { studentId } = req.body;
+
+      console.log('Adding student to class:', {
+          classId,
+          studentId,
+          teacherId: req.user.userId
+      });
+
+      if (!studentId) {
+          throw new ErrorResponse('Student ID is required', 400);
+      }
+
+      // Get class and verify ownership
+      const classDoc = await Class.findById(classId)
+          .populate('teacher');
+
+      if (!classDoc) {
+          throw new ErrorResponse('Class not found', 404);
+      }
+
+      const teacherId = classDoc.teacher._id.toString();
+      if (teacherId !== req.user.userId) {
+          throw new ErrorResponse('Not authorized to modify this class', 403);
+      }
+
+      // Verify student exists and is not already enrolled
+      const student = await User.findOne({
+          _id: studentId,
+          role: 'student'
+      });
+
+      if (!student) {
+          throw new ErrorResponse('Student not found', 404);
+      }
+
+      if (classDoc.students.includes(studentId)) {
+          throw new ErrorResponse('Student already enrolled in this class', 400);
+      }
+
+      // Add student to class
+      classDoc.students.push(studentId);
+      await classDoc.save();
+
+      res.status(200).json({
+          success: true,
+          data: classDoc
+      });
+  })
+);
 
 // Add this route to the existing router
 // Update in backend/routes/class.js

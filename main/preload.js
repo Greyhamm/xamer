@@ -216,8 +216,11 @@ class PreloadBridge {
         endpoint: `/classes/${classId}/students`,
         method: 'POST',
         data: { studentId },
-        headers: this.getAuthHeader()
-      }),
+        headers: {
+            'Content-Type': 'application/json',
+            ...this.getAuthHeader()
+        }
+    }),
     });
   }
 
