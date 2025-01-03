@@ -1,64 +1,65 @@
 const mongoose = require('mongoose');
 
 const ClassSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, 'Please provide a class name'],
-    trim: true
-  },
-  description: {
-    type: String,
-    trim: true
-  },
-  teacher: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  exams: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Exam'
-  }],
-  students: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
-  }]
+    name: {
+        type: String,
+        required: [true, 'Please provide a class name'],
+        trim: true
+    },
+    description: {
+        type: String,
+        trim: true
+    },
+    teacher: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
+    exams: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Exam'
+    }],
+    students: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }]
 }, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 });
 
-// Track population state using query options
+// Update the population middleware
 ClassSchema.pre(/^find/, function(next) {
-  // Skip if this is a nested population
-  if (this.options?._recursed) {
-    return next();
-  }
+    // Skip if this is a nested population
+    if (this.options?._recursed) {
+        return next();
+    }
 
-  // Mark as recursed to prevent infinite loops
-  this.options._recursed = true;
+    // Mark as recursed to prevent infinite loops
+    this.options._recursed = true;
 
-  this.populate({
-    path: 'teacher',
-    select: 'username _id'
-  });
+    this.populate({
+        path: 'teacher',
+        select: 'username _id'
+    });
 
-  this.populate({
-    path: 'students',
-    select: 'username email createdAt'
-  });
+    this.populate({
+        path: 'students',
+        select: 'username email createdAt'
+    });
 
-  // Only populate basic exam info without class reference
-  this.populate({
-    path: 'exams',
-    select: 'title status creator',
-    options: { _recursed: true }
-  });
+    // Update exam population to explicitly include questions field
+    this.populate({
+        path: 'exams',
+        select: 'title status questions createdAt updatedAt',
+        options: { _recursed: true }
+    });
 
-  next();
+    next();
 });
 
+module.exports = mongoose.model('Class', ClassSchema);
 
 // Pre-save middleware for logging
 ClassSchema.pre('save', function(next) {

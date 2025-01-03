@@ -186,6 +186,10 @@ export default class ClassView {
             `;
         } else {
             exams.forEach(exam => {
+                // Simply count the length of the questions array
+                const questionCount = exam.questions?.length || 0;
+                console.log(`Exam ${exam._id} question count:`, questionCount, 'Questions array:', exam.questions);
+
                 const examCard = document.createElement('div');
                 examCard.className = 'exam-card';
                 examCard.innerHTML = `
@@ -196,7 +200,7 @@ export default class ClassView {
                     <div class="exam-card-stats">
                         <div class="stat">
                             <span class="label">Questions:</span>
-                            <span class="value">${exam?.questions?.length || 0}</span>
+                            <span class="value">${questionCount}</span>
                         </div>
                         <div class="stat">
                             <span class="label">Created:</span>
@@ -204,10 +208,10 @@ export default class ClassView {
                         </div>
                     </div>
                     <div class="exam-card-actions">
-                        <button class="btn btn-secondary view-btn">View Details</button>
+                        <button class="btn btn-secondary view-btn" data-exam-id="${exam._id}">View Details</button>
                         ${exam?.status === 'draft' ? 
-                            '<button class="btn btn-primary publish-btn">Publish</button>' : 
-                            '<button class="btn btn-secondary submissions-btn">View Submissions</button>'}
+                            `<button class="btn btn-primary publish-btn" data-exam-id="${exam._id}">Publish</button>` : 
+                            `<button class="btn btn-secondary submissions-btn" data-exam-id="${exam._id}">View Submissions</button>`}
                     </div>
                 `;
 
