@@ -1,5 +1,5 @@
 import AppState from '../../services/state/AppState.js';
-
+import AddStudentsModal from './AddStudentsModal.js';
 export default class ClassView {
     constructor(classId) {
         this.state = {
@@ -153,6 +153,7 @@ export default class ClassView {
         return section;
     }
 
+
     renderStudentsSection() {
         const section = document.createElement('div');
         section.className = 'dashboard-section students-section';
@@ -166,6 +167,22 @@ export default class ClassView {
             </div>
             <p class="section-description">Manage enrolled students and their progress</p>
         `;
+
+        // Add click handler for the Add Student button
+        header.querySelector('.add-student-btn').addEventListener('click', () => {
+            const addStudentsModal = new AddStudentsModal({
+                classId: this.state.classId,
+                onSubmit: async (addedStudents) => {
+                    // Refresh class data to show new students
+                    await this.loadClassData();
+                },
+                onClose: () => {
+                    // Modal handles its own cleanup
+                }
+            });
+            
+            document.body.appendChild(addStudentsModal.render());
+        });
 
         const studentsList = document.createElement('div');
         studentsList.className = 'students-list';
@@ -208,7 +225,6 @@ export default class ClassView {
         section.appendChild(studentsList);
         return section;
     }
-
     render() {
         this.container = document.createElement('div');
         this.container.className = 'class-view-container';

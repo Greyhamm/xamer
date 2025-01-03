@@ -42,8 +42,9 @@ class PreloadBridge {
 
   getAuthHeader() {
     const token = localStorage.getItem('token');
+    console.log('Getting auth header, token exists:', !!token);
     return token ? { 'Authorization': `Bearer ${token}` } : {};
-  }
+}
 
   async login(options) {
     try {
@@ -69,72 +70,37 @@ class PreloadBridge {
       };
     }
   }
-  
-  async fetchApi({ endpoint, data = {}, method = 'POST', headers = {} } = {}) {
-    const defaultHeaders = {
-      'Content-Type': 'application/json',
-      ...this.getAuthHeader(),
-      ...headers
-    };
-  
-    try {
-      const url = `http://localhost:3000/api${endpoint}`;
-      console.log('Making API request to:', url);
-      
-      const response = await fetch(url, {
-        method,
-        headers: defaultHeaders,
-        body: method !== 'GET' ? JSON.stringify(data) : undefined
-      });
-  
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Invalid response format from server');
-      }
-  
-      const responseData = await response.json();
-      console.log('API Response:', responseData);
-  
-      if (!response.ok) {
-        throw new Error(responseData.error || responseData.message || 'API request failed');
-      }
-  
-      return responseData;
-    } catch (error) {
-      console.error(`Fetch API Error at ${endpoint}:`, error);
-      throw error;
-    }
-  }
+
 
   async fetchApi({ endpoint, data = {}, method = 'POST', headers = {} } = {}) {
     const defaultHeaders = {
-      'Content-Type': 'application/json',
-      ...this.getAuthHeader(),
-      ...headers
+        'Content-Type': 'application/json',
+        ...this.getAuthHeader(),
+        ...headers
     };
 
+    console.log('Making API request to:', endpoint);
+    console.log('Headers:', defaultHeaders);
+
     try {
-      const url = `http://localhost:3000/api${endpoint}`;
-      console.log('Making API request to:', url);
-      console.log('Headers:', defaultHeaders);
+        const url = `http://localhost:3000/api${endpoint}`;
+        const response = await fetch(url, {
+            method,
+            headers: defaultHeaders,
+            body: method !== 'GET' ? JSON.stringify(data) : undefined
+        });
 
-      const response = await fetch(url, {
-        method,
-        headers: defaultHeaders,
-        body: method !== 'GET' ? JSON.stringify(data) : undefined
-      });
+        const responseData = await response.json();
+        console.log('API Response:', responseData);
 
-      const responseData = await response.json();
-      console.log('API Response:', responseData);
+        if (!response.ok) {
+            throw new Error(responseData.error || responseData.message || 'API request failed');
+        }
 
-      if (!response.ok) {
-        throw new Error(responseData.error || responseData.message || 'API request failed');
-      }
-
-      return responseData;
+        return responseData;
     } catch (error) {
-      console.error(`Fetch API Error at ${endpoint}:`, error);
-      throw new Error(error.message || 'API request failed');
+        console.error(`Fetch API Error at ${endpoint}:`, error);
+        throw new Error(error.message || 'API request failed');
     }
   }
 
@@ -239,11 +205,12 @@ class PreloadBridge {
 
 
 
-    searchStudents: (options) => this.fetchApi({
-      endpoint: `/classes/${options.classId}/search-students?query=${encodeURIComponent(options.data.query)}`,
-      method: 'GET',
-      headers: this.getAuthHeader()
-    }),
+      searchStudents : (options) => this.fetchApi({
+        endpoint: `/classes/${options.classId}/search-students?query=${encodeURIComponent(options.data.query)}`,
+        method: 'GET',
+        headers: this.getAuthHeader()  // Ensure we're passing auth headers
+      }),
+
 
       addStudentToClass: (classId, studentId) => this.fetchApi({
         endpoint: `/classes/${classId}/students`,
