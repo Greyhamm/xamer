@@ -3,7 +3,7 @@
 @import 'components/auth.css';
 @import 'components/dashboard.css';
 @import 'components/exam.css';
-
+@import 'components/classView.css';
 
 :root {
     --primary-color: #4a90e2;
