@@ -36,16 +36,7 @@ const userSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-// Hash password before saving
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) {
-    next();
-  }
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-});
-
-// Sign JWT and return
+// Remove password hashing from pre-save hook since we're handling it in the controller
 userSchema.methods.getSignedJwtToken = function() {
   return jwt.sign(
     { userId: this._id, role: this.role },

@@ -8,11 +8,10 @@ class AuthController {
   // @route   POST /api/auth/signup
   // @access  Public
   register = asyncHandler(async (req, res) => {
-    console.log('Received body:', req.body); // Log entire request body
-
+    console.log('Received registration request');
+    
     const { username, email, password, role } = req.body;
-    console.log('Received role:', role);
-
+    
     // Validate role
     if (!['student', 'teacher'].includes(role)) {
       throw new ErrorResponse('Invalid role', 400);
@@ -24,69 +23,92 @@ class AuthController {
       throw new ErrorResponse('User already exists', 400);
     }
 
-    // Hash password
+    // Hash password with a cost factor of 10
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    console.log('Password hashed successfully.');
-
-    // Create user
+    
+    console.log('Creating user with hashed password');
+    
+    // Create user with hashed password
     const user = await User.create({
       username,
       email,
       password: hashedPassword,
       role
     });
-    console.log('User created successfully:', user);
 
     // Generate JWT Token
     const token = user.getSignedJwtToken();
-    console.log('JWT token generated:', token);
+
+    // Log success but don't log sensitive data
+    console.log('User created successfully:', {
+      id: user._id,
+      username: user.username,
+      role: user.role
+    });
 
     // Send response
     res.status(201).json({
       success: true,
       token,
-      role: user.role
+      userId: user._id.toString(),
+      role: user.role,
+      username: user.username
     });
   });
+
 
   // @desc    Login user
   // @route   POST /api/auth/login
   // @access  Public
   login = asyncHandler(async (req, res) => {
     const { email, password } = req.body;
-    console.log('Login attempt:', { email, password });
+    console.log('Login attempt for:', email);
 
     // Validate email and password
     if (!email || !password) {
       throw new ErrorResponse('Please provide an email and password', 400);
     }
 
-    // Check for user
-    const user = await User.findOne({ email }).select('+password');
-    if (!user) {
+    try {
+      // Find user and explicitly select password field
+      const user = await User.findOne({ email }).select('+password');
+      
+      if (!user) {
+        console.log('No user found with email:', email);
+        throw new ErrorResponse('Invalid credentials', 401);
+      }
+
+      // Log password comparison details (but not the actual passwords)
+      console.log('Comparing passwords for user:', user._id);
+      
+      // Compare passwords
+      const isMatch = await bcrypt.compare(password, user.password);
+      console.log('Password match result:', isMatch);
+
+      if (!isMatch) {
+        throw new ErrorResponse('Invalid credentials', 401);
+      }
+
+      // Generate token
+      const token = user.getSignedJwtToken();
+      console.log('Login successful for user:', user._id);
+
+      // Send response
+      res.status(200).json({
+        success: true,
+        token,
+        userId: user._id.toString(),
+        role: user.role,
+        username: user.username
+      });
+    } catch (error) {
+      console.error('Login error:', error);
       throw new ErrorResponse('Invalid credentials', 401);
     }
+  });
 
-    // Check if password matches
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      throw new ErrorResponse('Invalid credentials', 401);
-    }
 
-    // Generate JWT Token
-    const token = user.getSignedJwtToken();
-    console.log('JWT token generated for login:', token);
-
-    // Send response with user data
-    res.status(200).json({
-      success: true,
-      token,
-      userId: user._id.toString(), // Ensure it's a string
-      role: user.role,
-      username: user.username
-    });
-});
 
   // @desc    Get current logged in user
   // @route   GET /api/auth/profile

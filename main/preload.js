@@ -51,15 +51,57 @@ class PreloadBridge {
         endpoint: '/auth/login',
         data: options.data,
         method: 'POST',
-        headers: options.headers
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers
+        }
       });
-
+  
       if (response.success) {
         this.saveUserData(response);
       }
       return response;
     } catch (error) {
       console.error('Login error:', error);
+      return {
+        success: false,
+        message: error.message || 'Login failed - please try again'
+      };
+    }
+  }
+  
+  async fetchApi({ endpoint, data = {}, method = 'POST', headers = {} } = {}) {
+    const defaultHeaders = {
+      'Content-Type': 'application/json',
+      ...this.getAuthHeader(),
+      ...headers
+    };
+  
+    try {
+      const url = `http://localhost:3000/api${endpoint}`;
+      console.log('Making API request to:', url);
+      
+      const response = await fetch(url, {
+        method,
+        headers: defaultHeaders,
+        body: method !== 'GET' ? JSON.stringify(data) : undefined
+      });
+  
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Invalid response format from server');
+      }
+  
+      const responseData = await response.json();
+      console.log('API Response:', responseData);
+  
+      if (!response.ok) {
+        throw new Error(responseData.error || responseData.message || 'API request failed');
+      }
+  
+      return responseData;
+    } catch (error) {
+      console.error(`Fetch API Error at ${endpoint}:`, error);
       throw error;
     }
   }
@@ -193,7 +235,22 @@ class PreloadBridge {
       
       uploadMedia: async (file) => {
         return await this.uploadMedia(file);
-      }
+      },
+
+
+
+    searchStudents: (options) => this.fetchApi({
+      endpoint: `/classes/${options.classId}/search-students?query=${encodeURIComponent(options.data.query)}`,
+      method: 'GET',
+      headers: this.getAuthHeader()
+    }),
+
+      addStudentToClass: (classId, studentId) => this.fetchApi({
+        endpoint: `/classes/${classId}/students`,
+        method: 'POST',
+        data: { studentId },
+        headers: this.getAuthHeader()
+      }),
     });
   }
 
