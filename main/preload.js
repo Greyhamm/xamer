@@ -221,6 +221,14 @@ class PreloadBridge {
             ...this.getAuthHeader()
         }
     }),
+
+    removeStudentFromClass: (classId, studentId) => this.fetchApi({
+      endpoint: `/classes/${classId}/students/${studentId}`,
+      method: 'DELETE',
+      headers: this.getAuthHeader()
+    }),
+    
+  
     });
   }
 

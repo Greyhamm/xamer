@@ -11,6 +11,24 @@ export default class ClassView {
         this.loadClassData();
     }
 
+
+    formatDate(dateString) {
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'N/A';
+        return date.toLocaleDateString();
+    }
+
+    async removeStudent(studentId) {
+        try {
+            await window.api.removeStudentFromClass(this.state.classId, studentId);
+            await this.loadClassData(); // Refresh the view
+        } catch (error) {
+            console.error('Failed to remove student:', error);
+            // You might want to show an error message to the user here
+        }
+    }
+    
     async loadClassData() {
         try {
             const response = await window.api.getClass({ classId: this.state.classId });
@@ -153,7 +171,6 @@ export default class ClassView {
         return section;
     }
 
-
     renderStudentsSection() {
         const section = document.createElement('div');
         section.className = 'dashboard-section students-section';
@@ -168,19 +185,14 @@ export default class ClassView {
             <p class="section-description">Manage enrolled students and their progress</p>
         `;
 
-        // Add click handler for the Add Student button
+        // Add student button handler
         header.querySelector('.add-student-btn').addEventListener('click', () => {
             const addStudentsModal = new AddStudentsModal({
                 classId: this.state.classId,
                 onSubmit: async (addedStudents) => {
-                    // Refresh class data to show new students
                     await this.loadClassData();
-                },
-                onClose: () => {
-                    // Modal handles its own cleanup
                 }
             });
-            
             document.body.appendChild(addStudentsModal.render());
         });
 
@@ -207,24 +219,46 @@ export default class ClassView {
                     </thead>
                     <tbody>
                         ${this.state.classData.students.map(student => `
-                            <tr>
+                            <tr data-student-id="${student._id}">
                                 <td>${student.username}</td>
                                 <td>${student.email}</td>
-                                <td>${new Date(student.createdAt).toLocaleDateString()}</td>
-                                <td>
-                                    <button class="btn btn-secondary btn-sm">View Progress</button>
+                                <td>${this.formatDate(student.createdAt)}</td>
+                                <td class="action-buttons">
+                                    <button class="btn btn-secondary btn-sm view-progress-btn">
+                                        View Progress
+                                    </button>
+                                    <button class="btn btn-danger btn-sm remove-student-btn">
+                                        Remove
+                                    </button>
                                 </td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
             `;
+
+            // Add event listeners for remove buttons
+            const tbody = studentsList.querySelector('tbody');
+            tbody.addEventListener('click', async (e) => {
+                const button = e.target.closest('button');
+                if (!button) return;
+
+                const row = button.closest('tr');
+                const studentId = row.dataset.studentId;
+
+                if (button.classList.contains('remove-student-btn')) {
+                    if (confirm('Are you sure you want to remove this student from the class?')) {
+                        await this.removeStudent(studentId);
+                    }
+                }
+            });
         }
 
         section.appendChild(header);
         section.appendChild(studentsList);
         return section;
     }
+
     render() {
         this.container = document.createElement('div');
         this.container.className = 'class-view-container';

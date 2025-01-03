@@ -149,4 +149,40 @@ router.get(
     })
 );
 
+// Add to backend/routes/class.js
+
+router.delete(
+  '/classes/:classId/students/:studentId',
+  protect,
+  authorize('teacher'),
+  asyncHandler(async (req, res) => {
+      const { classId, studentId } = req.params;
+
+      const classDoc = await Class.findById(classId)
+          .populate('teacher');
+
+      if (!classDoc) {
+          throw new ErrorResponse('Class not found', 404);
+      }
+
+      // Verify teacher owns the class
+      const teacherId = classDoc.teacher._id.toString();
+      if (teacherId !== req.user.userId) {
+          throw new ErrorResponse('Not authorized to modify this class', 403);
+      }
+
+      // Remove student from class
+      classDoc.students = classDoc.students.filter(
+          student => student.toString() !== studentId
+      );
+      
+      await classDoc.save();
+
+      res.status(200).json({
+          success: true,
+          data: classDoc
+      });
+  })
+);
+
 module.exports = router;
