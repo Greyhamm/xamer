@@ -272,6 +272,85 @@ class ExamController {
             throw error;
         }
     }
+
+    async getExams(req, res, next) {
+        try {
+            console.log('Getting exams for user:', req.user);
+    
+            let exams;
+            if (req.user.role === 'teacher') {
+                // For teachers, get all exams they've created
+                exams = await Exam.find({ creator: req.user.userId })
+                    .populate('questions')
+                    .populate('class', 'name')
+                    .lean();
+            } else if (req.user.role === 'student') {
+                // For students, get published exams
+                exams = await Exam.find({ 
+                    status: 'published',
+                    // Optionally, you might want to filter by class if needed
+                    // class: { $in: studentClasses }  // This would require additional logic to get student's classes
+                })
+                    .populate('questions')
+                    .populate('class', 'name')
+                    .lean();
+            } else {
+                throw new ErrorResponse('Invalid user role', 403);
+            }
+    
+            res.status(200).json({
+                success: true,
+                count: exams.length,
+                data: exams
+            });
+        } catch (error) {
+            console.error('Get exams error:', error);
+            next(error);
+        }
+    }
+
+    async getExam(req, res, next) {
+        try {
+          const examId = req.params.id;
+          
+          // Determine access based on user role
+          let exam;
+          if (req.user.role === 'teacher') {
+            // Teachers can see any exam they created
+            exam = await Exam.findOne({ 
+              _id: examId, 
+              creator: req.user.userId 
+            })
+            .populate('questions')
+            .populate('class', 'name')
+            .lean();
+          } else if (req.user.role === 'student') {
+            // Students can only see published exams
+            exam = await Exam.findOne({ 
+              _id: examId, 
+              status: 'published' 
+            })
+            .populate('questions')
+            .populate('class', 'name')
+            .lean();
+          }
+      
+          if (!exam) {
+            return res.status(404).json({
+              success: false,
+              error: 'Exam not found or not accessible'
+            });
+          }
+      
+          res.status(200).json({
+            success: true,
+            data: exam
+          });
+        } catch (error) {
+          console.error('Get exam error:', error);
+          next(error);
+        }
+      }
 }
 
 

@@ -83,6 +83,21 @@ class ExamAPI {
             throw error;
         }
     }
+
+    static async getExamById(examId) {
+        try {
+          const response = await window.api.getExamById(examId);
+          
+          if (!response.success) {
+            throw new Error(response.error || 'Failed to fetch exam');
+          }
+          
+          return response.data;
+        } catch (error) {
+          console.error(`Error fetching exam with ID ${examId}:`, error);
+          throw error;
+        }
+      }
 }
 
 export default ExamAPI;

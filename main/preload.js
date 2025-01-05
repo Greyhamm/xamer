@@ -136,7 +136,43 @@ class PreloadBridge {
         method: 'POST',
         data: { studentId }
       }),
+        // Student-specific endpoints
+      getExams: () => this.fetchApi({
+        endpoint: '/exams',
+        method: 'GET',
+        headers: this.getAuthHeader()
+      }),
+      
+      getExamStats: () => this.fetchApi({
+          endpoint: '/exams/stats',
+          method: 'GET',
+          headers: this.getAuthHeader()
+      }),
 
+      startExam: (examId) => this.fetchApi({
+          endpoint: `/exams/${examId}/start`,
+          method: 'POST',
+          headers: this.getAuthHeader()
+      }),
+
+      submitExam: (examId, answers) => this.fetchApi({
+          endpoint: `/exams/${examId}/submit`,
+          method: 'POST',
+          data: { answers },
+          headers: this.getAuthHeader()
+      }),
+
+      getSubmissions: () => this.fetchApi({
+          endpoint: '/submissions',
+          method: 'GET',
+          headers: this.getAuthHeader()
+      }),
+     
+      getExamById: (examId) => this.fetchApi({
+        endpoint: `/exams/${examId}`,
+        method: 'GET',
+        headers: this.getAuthHeader()
+      }),
       // Exam related endpoints
       createExam: async (examData) => {
         console.log('Creating exam, user data:', this.userData);
@@ -224,6 +260,19 @@ class PreloadBridge {
       removeStudentFromClass: (classId, studentId) => this.fetchApi({
           endpoint: `/classes/${classId}/students/${studentId}`,
           method: 'DELETE',
+          headers: this.getAuthHeader()
+      }),
+
+
+      getStudentStats: () => this.fetchApi({
+          endpoint: '/exams/stats/student',
+          method: 'GET',
+          headers: this.getAuthHeader()
+      }),
+      
+      getAvailableExams: () => this.fetchApi({
+          endpoint: '/exams/available',
+          method: 'GET',
           headers: this.getAuthHeader()
       })
   });

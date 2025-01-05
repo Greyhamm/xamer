@@ -1,167 +1,191 @@
-import ExamAPI from '../../services/api/examAPI.js';
-import SubmissionAPI from '../../services/api/submissionAPI.js';
+import ExamState from '../../services/state/ExamState.js';
 import { formatDate } from '../../services/utils/formating.js';
 import AppState from '../../services/state/AppState.js';
 
 export default class StudentDashboard {
-  constructor() {
-    this.state = {
-      stats: null,
-      availableExams: [],
-      recentSubmissions: [],
-      loading: true,
-      error: null
-    };
-  }
+    constructor() {
+        this.state = {
+            stats: {
+                totalExamsTaken: 0,
+                averageScore: 0,
+                pendingResults: 0
+            },
+            availableExams: [],
+            loading: true,
+            error: null
+        };
 
-  async loadDashboardData() {
-    try {
-      const [stats, submissions, exams] = await Promise.all([
-        ExamAPI.getStudentStats(),
-        SubmissionAPI.getSubmissions(),
-        ExamAPI.getExams()
-      ]);
-
-      // Filter out exams that have already been submitted
-      const submittedExamIds = submissions.map(sub => sub.exam._id);
-      const availableExams = exams.filter(exam => 
-        exam.status === 'published' && !submittedExamIds.includes(exam._id)
-      );
-
-      this.setState({
-        stats,
-        availableExams,
-        recentSubmissions: submissions.slice(0, 5),
-        loading: false
-      });
-    } catch (error) {
-      this.setState({ error: error.message, loading: false });
+        // Initialize
+        this.loadDashboardData();
     }
-  }
 
-  setState(newState) {
-    this.state = { ...this.state, ...newState };
-    this.updateUI();
-  }
+    async loadDashboardData() {
+        try {
+            this.state.loading = true;
+            this.updateUI();
 
-  renderStatsCards() {
-    const container = document.createElement('div');
-    container.className = 'stats-cards';
+            // Get available exams
+            const examsResponse = await window.api.getExams();
+            console.log('Exams response:', examsResponse);
 
-    const stats = [
-      { label: 'Exams Taken', value: this.state.stats.totalExamsTaken },
-      { label: 'Average Score', value: `${Math.round(this.state.stats.averageScore)}%` },
-      { label: 'Exams Available', value: this.state.availableExams.length },
-      { label: 'Pending Results', value: this.state.stats.pendingResults }
-    ];
+            if (examsResponse.success) {
+                // Filter for published exams only
+                this.state.availableExams = examsResponse.data.filter(exam => 
+                    exam.status === 'published'
+                );
+            }
 
-    stats.forEach(stat => {
-      const card = document.createElement('div');
-      card.className = 'stat-card';
-      card.innerHTML = `
-        <h3>${stat.label}</h3>
-        <p class="stat-value">${stat.value}</p>
-      `;
-      container.appendChild(card);
-    });
+            // Get exam stats if available
+            try {
+                const statsResponse = await window.api.getExamStats();
+                console.log('Stats response:', statsResponse);
+                if (statsResponse.success) {
+                    this.state.stats = statsResponse.data;
+                }
+            } catch (error) {
+                console.warn('Could not load exam stats:', error);
+                // Continue without stats
+            }
 
-    return container;
-  }
+            this.state.loading = false;
+            this.updateUI();
 
-  renderAvailableExams() {
-    const container = document.createElement('div');
-    container.className = 'available-exams section';
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+            this.state.error = error.message;
+            this.state.loading = false;
+            this.updateUI();
+        }
+    }
 
-    const header = document.createElement('div');
-    header.className = 'section-header';
-    header.innerHTML = '<h3>Available Exams</h3>';
+    updateUI() {
+        if (!this.container) return;
+        this.container.innerHTML = '';
+        this.container.appendChild(this.render());
+    }
 
-    const examsList = document.createElement('div');
-    examsList.className = 'exams-list';
+    renderStatsCards() {
+        const container = document.createElement('div');
+        container.className = 'stats-cards';
 
-    if (this.state.availableExams.length === 0) {
-      examsList.innerHTML = '<p class="no-data">No exams available at the moment.</p>';
-    } else {
-      this.state.availableExams.forEach(exam => {
-        const examCard = document.createElement('div');
-        examCard.className = 'exam-card';
-        examCard.innerHTML = `
-          <h4>${exam.title}</h4>
-          <p>Questions: ${exam.questions.length}</p>
-          <p>Created by: ${exam.creator.username}</p>
-          <button class="btn btn-primary">Start Exam</button>
-        `;
+        const stats = [
+            { 
+                label: 'Available Exams', 
+                value: this.state.availableExams.length 
+            },
+            { 
+                label: 'Exams Taken', 
+                value: this.state.stats.totalExamsTaken || 0 
+            },
+            { 
+                label: 'Average Score', 
+                value: `${Math.round(this.state.stats.averageScore || 0)}%` 
+            },
+            { 
+                label: 'Pending Results', 
+                value: this.state.stats.pendingResults || 0 
+            }
+        ];
 
-        const startButton = examCard.querySelector('button');
-        startButton.addEventListener('click', () => {
-          AppState.navigateTo('examTaker', { examId: exam._id });
+        stats.forEach(stat => {
+            const card = document.createElement('div');
+            card.className = 'stat-card';
+            card.innerHTML = `
+                <h3>${stat.label}</h3>
+                <p class="stat-value">${stat.value}</p>
+            `;
+            container.appendChild(card);
         });
 
-        examsList.appendChild(examCard);
-      });
+        return container;
     }
 
-    container.appendChild(header);
-    container.appendChild(examsList);
-    return container;
-  }
+    renderAvailableExams() {
+        const section = document.createElement('div');
+        section.className = 'dashboard-section';
 
-  renderRecentResults() {
-    const container = document.createElement('div');
-    container.className = 'recent-results section';
+        const header = document.createElement('div');
+        header.className = 'section-header';
+        header.innerHTML = `
+            <div class="header-content">
+                <h2>Available Exams</h2>
+            </div>
+            <p class="section-description">Take your pending exams</p>
+        `;
 
-    const header = document.createElement('div');
-    header.className = 'section-header';
-    header.innerHTML = '<h3>Recent Results</h3>';
+        const examGrid = document.createElement('div');
+        examGrid.className = 'exam-grid';
 
-    const resultsList = document.createElement('div');
-    resultsList.className = 'results-list';
+        if (!this.state.availableExams.length) {
+            examGrid.innerHTML = `
+                <div class="empty-state">
+                    <p>No exams available at the moment</p>
+                    <p>Check back later for new exams</p>
+                </div>
+            `;
+        } else {
+            this.state.availableExams.forEach(exam => {
+                const examCard = document.createElement('div');
+                examCard.className = 'exam-card';
+                examCard.innerHTML = `
+                    <div class="exam-card-header">
+                        <h3>${exam.title}</h3>
+                        <span class="status-badge published">Available</span>
+                    </div>
+                    <div class="exam-card-stats">
+                        <div class="stat">
+                            <span class="label">Questions:</span>
+                            <span class="value">${exam.questions?.length || 0}</span>
+                        </div>
+                        <div class="stat">
+                            <span class="label">Class:</span>
+                            <span class="value">${exam.class?.name || 'General'}</span>
+                        </div>
+                    </div>
+                    <div class="exam-card-actions">
+                        <button class="btn btn-primary start-exam-btn" data-exam-id="${exam._id}">
+                            Start Exam
+                        </button>
+                    </div>
+                `;
 
-    this.state.recentSubmissions.forEach(submission => {
-      const resultCard = document.createElement('div');
-      resultCard.className = 'result-card';
-      resultCard.innerHTML = `
-        <h4>${submission.exam.title}</h4>
-        <p>Submitted: ${formatDate(submission.submittedAt)}</p>
-        <p>Status: <span class="status-badge ${submission.status}">
-          ${submission.status}
-        </span></p>
-        ${submission.status === 'graded' ? 
-          `<p class="score">Score: ${submission.totalScore}%</p>` : 
-          '<p class="pending">Awaiting grading</p>'}
-        <button class="btn btn-secondary">View Details</button>
-      `;
+                const startButton = examCard.querySelector('.start-exam-btn');
+                startButton.addEventListener('click', () => {
+                    AppState.navigateTo('examTaker', { examId: exam._id });
+                });
 
-      const viewButton = resultCard.querySelector('button');
-      viewButton.addEventListener('click', () => {
-        AppState.navigateTo('submissionDetails', { submissionId: submission._id });
-      });
+                examGrid.appendChild(examCard);
+            });
+        }
 
-      resultsList.appendChild(resultCard);
-    });
-
-    container.appendChild(header);
-    container.appendChild(resultsList);
-    return container;
-  }
-
-  async render() {
-    const container = document.createElement('div');
-    container.className = 'student-dashboard';
-
-    // Example functionality using SubmissionAPI
-    try {
-      const submissions = await SubmissionAPI.getSubmissions();
-      submissions.forEach((submission) => {
-        const submissionElement = document.createElement('div');
-        submissionElement.textContent = `Submission ID: ${submission.id}, Status: ${submission.status}`;
-        container.appendChild(submissionElement);
-      });
-    } catch (error) {
-      console.error('Failed to load submissions:', error);
-      container.innerHTML += '<p>Failed to load submissions.</p>';
+        section.appendChild(header);
+        section.appendChild(examGrid);
+        return section;
     }
 
-    return container;
-  }
+    render() {
+        this.container = document.createElement('div');
+        this.container.className = 'student-dashboard';
+
+        if (this.state.loading) {
+            const loading = document.createElement('div');
+            loading.className = 'loading';
+            loading.textContent = 'Loading dashboard...';
+            this.container.appendChild(loading);
+            return this.container;
+        }
+
+        if (this.state.error) {
+            const error = document.createElement('div');
+            error.className = 'error-message';
+            error.textContent = this.state.error;
+            this.container.appendChild(error);
+            return this.container;
+        }
+
+        this.container.appendChild(this.renderStatsCards());
+        this.container.appendChild(this.renderAvailableExams());
+
+        return this.container;
+    }
 }
