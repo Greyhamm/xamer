@@ -48,30 +48,54 @@ class ClassController {
   });
 
 
-    getClass = asyncHandler(async (req, res) => {
-      console.log('Getting class with ID:', req.params.classId);
-      
-      const classData = await Class.findById(req.params.classId)
-        .select('+students +exams') // Explicitly select these fields
-        .lean(); // Use lean() for better performance
-  
-      if (!classData) {
+  getClass = asyncHandler(async (req, res) => {
+    console.log('Getting class with ID:', req.params.classId);
+    
+    const classData = await Class.findById(req.params.classId)
+        .populate({
+            path: 'exams',
+            select: 'title status questions createdAt updatedAt', // Explicitly include questions
+            transform: doc => ({
+                ...doc,
+                questionCount: doc.questions ? doc.questions.length : 0 // Add questionCount field
+            })
+        })
+        .populate('students', 'username email createdAt')
+        .populate('teacher', 'username _id')
+        .lean();
+
+    if (!classData) {
         throw new ErrorResponse('Class not found', 404);
-      }
-  
-      const teacherId = classData.teacher._id.toString();
-      const requestUserId = req.user.userId.toString();
-  
-      if (teacherId !== requestUserId) {
+    }
+
+    const teacherId = classData.teacher._id.toString();
+    const requestUserId = req.user.userId.toString();
+
+    if (teacherId !== requestUserId) {
         throw new ErrorResponse('Not authorized to access this class', 403);
-      }
-  
-      res.status(200).json({
+    }
+
+    // Debug logging
+    console.log('Class data exams:', classData.exams.map(exam => ({
+        id: exam._id,
+        title: exam.title,
+        questions: exam.questions,
+        questionCount: exam.questions ? exam.questions.length : 0
+    })));
+
+    // Ensure questions array exists on each exam
+    classData.exams = classData.exams.map(exam => ({
+        ...exam,
+        questions: exam.questions || [], // Ensure questions exists
+        questionCount: exam.questions ? exam.questions.length : 0
+    }));
+
+    res.status(200).json({
         success: true,
         data: classData
-      });
     });
-  
+});
+
     // Get classes
     getClasses = asyncHandler(async (req, res) => {
       const classes = await Class.find({ teacher: req.user.userId })
