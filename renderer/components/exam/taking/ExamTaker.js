@@ -1,7 +1,6 @@
 import MultipleChoiceRenderer from './QuestionTypes/MultipleChoiceRenderer.js';
 import WrittenRenderer from './QuestionTypes/WrittenRenderer.js';
 import CodingRenderer from './QuestionTypes/CodingRenderer.js';
-import ExamAPI from '../../../services/api/examAPI.js';
 
 export default class ExamTaker {
   constructor() {
@@ -19,6 +18,8 @@ export default class ExamTaker {
       Written: WrittenRenderer,
       Coding: CodingRenderer
     };
+
+    this.currentRenderer = null;
   }
 
   setState(newState) {
@@ -43,51 +44,108 @@ export default class ExamTaker {
     if (this.nextButton) {
       const isLast = this.state.currentQuestionIndex === this.state.exam.questions.length - 1;
       this.nextButton.textContent = isLast ? 'Submit Exam' : 'Next Question';
+      this.nextButton.disabled = this.state.loading;
     }
 
-    // Render current question
+    // Show error message if any
+    if (this.errorElement) {
+      this.errorElement.style.display = this.state.error ? 'block' : 'none';
+      if (this.state.error) {
+        this.errorElement.textContent = this.state.error;
+      }
+    }
+
     this.renderCurrentQuestion();
   }
 
   async loadExam(examId) {
     try {
       this.setState({ loading: true, error: null });
-      const exam = await ExamAPI.getExamById(examId);
-      this.setState({ exam, loading: false });
+      const examResponse = await window.api.getExamById(examId);
+      if (!examResponse.success) {
+        throw new Error(examResponse.error || 'Failed to load exam');
+      }
+      this.setState({ exam: examResponse.data, loading: false });
       return true;
     } catch (error) {
       this.setState({ error: error.message, loading: false });
       return false;
     }
   }
+  validateAnswers() {
+    const { exam, answers } = this.state;
+    const unansweredQuestions = exam.questions.filter(question => {
+      const answer = answers.get(question._id);
+      if (!answer) return true;
 
-  handleAnswerChange(answer) {
-    this.state.answers.set(answer.questionId, answer);
+      switch (question.type) {
+        case 'MultipleChoice':
+          return answer.selectedOption === null || answer.selectedOption === undefined;
+        case 'Written':
+          return !answer.answer || answer.answer.trim() === '';
+        case 'Coding':
+          return !answer.answer || answer.answer.trim() === '';
+        default:
+          return true;
+      }
+    });
+
+    if (unansweredQuestions.length > 0) {
+      const questionNumbers = unansweredQuestions.map((q) => {
+        const index = exam.questions.findIndex(eq => eq._id === q._id);
+        return index + 1;
+      });
+      
+      const questionTypes = unansweredQuestions.map(q => q.type);
+      const errorMessage = `Please answer all questions. Question${questionNumbers.length > 1 ? 's' : ''} ${questionNumbers.join(', ')} (${questionTypes.join(', ')}) ${questionNumbers.length > 1 ? 'are' : 'is'} incomplete.`;
+      
+      this.setState({ error: errorMessage });
+      return false;
+    }
+    return true;
   }
 
-  async submitExam() {
-    try {
-      this.setState({ loading: true, error: null });
+  handleAnswerChange(answer) {
+    const { answers } = this.state;
+    const currentQuestion = this.state.exam.questions[this.state.currentQuestionIndex];
+    
+    // Ensure we have all required fields
+    const fullAnswer = {
+      ...answer,
+      questionId: currentQuestion._id,
+      questionType: currentQuestion.type,
+      timeSpent: Math.floor((Date.now() - this.state.timeStarted) / 1000)
+    };
 
-      const answers = Array.from(this.state.answers.values());
-      if (answers.length !== this.state.exam.questions.length) {
-        throw new Error('Please answer all questions before submitting');
-      }
+    // Store the answer
+    answers.set(currentQuestion._id, fullAnswer);
+    
+    // Log the stored answer for debugging
+    console.log('Stored answer:', {
+      questionId: fullAnswer.questionId,
+      type: fullAnswer.questionType,
+      answer: fullAnswer.answer,
+      answerLength: fullAnswer.answer ? fullAnswer.answer.length : 0
+    });
 
-      await ExamAPI.submitExam(this.state.exam._id, {
-        answers,
-        timeSpent: Math.floor((Date.now() - this.state.timeStarted) / 1000)
-      });
-
-      alert('Exam submitted successfully!');
-      window.location.reload(); // Return to dashboard
-    } catch (error) {
-      this.setState({ error: error.message, loading: false });
-    }
+    this.setState({ answers });
   }
 
   renderCurrentQuestion() {
     if (!this.questionContainer) return;
+
+    // Store current answer if it exists
+    if (this.currentRenderer?.getValue) {
+      const currentAnswer = this.currentRenderer.getValue();
+      if (currentAnswer && currentAnswer.answer) {
+        this.state.answers.set(currentAnswer.questionId, currentAnswer);
+      }
+    }
+
+    // Clean up previous renderer
+    if (this.currentRenderer?.dispose) {
+      this.currentRenderer.dispose();
+    }
 
     this.questionContainer.innerHTML = '';
 
@@ -100,12 +158,72 @@ export default class ExamTaker {
       return;
     }
 
-    const renderer = new RendererClass(question, {
-      initialAnswer: this.state.answers.get(question._id),
-      onChange: (answer) => this.handleAnswerChange(answer)
+    const existingAnswer = this.state.answers.get(question._id);
+
+    // Create new renderer without triggering immediate state update
+    this.currentRenderer = new RendererClass(question, {
+      initialAnswer: existingAnswer,
+      onChange: (answer) => {
+        // Only update if answer actually changed
+        const current = this.state.answers.get(answer.questionId);
+        if (!current || current.answer !== answer.answer) {
+          this.handleAnswerChange(answer);
+        }
+      }
     });
 
-    this.questionContainer.appendChild(renderer.render());
+    this.questionContainer.appendChild(this.currentRenderer.render());
+}
+
+  async submitExam() {
+    try {
+      // Store the current answer before validation
+      if (this.currentRenderer?.getValue) {
+        const currentAnswer = this.currentRenderer.getValue();
+        this.state.answers.set(currentAnswer.questionId, currentAnswer);
+      }
+
+      if (!this.validateAnswers()) {
+        return;
+      }
+
+      this.setState({ loading: true, error: null });
+
+      const formattedAnswers = Array.from(this.state.answers.values()).map(answer => {
+        // Log each answer being submitted
+        console.log('Submitting answer:', {
+          questionId: answer.questionId,
+          type: answer.questionType,
+          answerLength: answer.answer ? answer.answer.length : 0
+        });
+
+        return {
+          questionId: answer.questionId,
+          answer: answer.answer,
+          timeSpent: answer.timeSpent
+        };
+      });
+
+      const response = await window.api.submitExam(this.state.exam._id, {
+        answers: formattedAnswers
+      });
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to submit exam');
+      }
+
+      alert('Exam submitted successfully!');
+      window.location.hash = '#/dashboard';
+    } catch (error) {
+      console.error('Submit exam error:', error);
+      this.setState({ error: error.message, loading: false });
+    }
+  }
+
+  navigateToQuestion(index) {
+    if (index >= 0 && index < this.state.exam.questions.length) {
+      this.setState({ currentQuestionIndex: index });
+    }
   }
 
   render() {
@@ -127,10 +245,17 @@ export default class ExamTaker {
       return this.container;
     }
 
+    // Error message container
+    this.errorElement = document.createElement('div');
+    this.errorElement.className = 'error-message';
+    this.errorElement.style.display = 'none';
+    this.container.appendChild(this.errorElement);
+
     // Exam header
     const header = document.createElement('div');
     header.className = 'exam-header';
     header.innerHTML = `<h2>${this.state.exam.title}</h2>`;
+    this.container.appendChild(header);
 
     // Progress bar
     const progressBar = document.createElement('div');
@@ -138,10 +263,12 @@ export default class ExamTaker {
     this.progressElement = document.createElement('div');
     this.progressElement.className = 'progress';
     progressBar.appendChild(this.progressElement);
+    this.container.appendChild(progressBar);
 
     // Question container
     this.questionContainer = document.createElement('div');
     this.questionContainer.className = 'question-container';
+    this.container.appendChild(this.questionContainer);
 
     // Navigation buttons
     const navigation = document.createElement('div');
@@ -151,9 +278,7 @@ export default class ExamTaker {
     this.prevButton.className = 'btn btn-secondary';
     this.prevButton.textContent = 'Previous';
     this.prevButton.addEventListener('click', () => {
-      if (this.state.currentQuestionIndex > 0) {
-        this.setState({ currentQuestionIndex: this.state.currentQuestionIndex - 1 });
-      }
+      this.navigateToQuestion(this.state.currentQuestionIndex - 1);
     });
 
     this.nextButton = document.createElement('button');
@@ -163,17 +288,12 @@ export default class ExamTaker {
       if (isLast) {
         this.submitExam();
       } else {
-        this.setState({ currentQuestionIndex: this.state.currentQuestionIndex + 1 });
+        this.navigateToQuestion(this.state.currentQuestionIndex + 1);
       }
     });
 
     navigation.appendChild(this.prevButton);
     navigation.appendChild(this.nextButton);
-
-    // Assemble container
-    this.container.appendChild(header);
-    this.container.appendChild(progressBar);
-    this.container.appendChild(this.questionContainer);
     this.container.appendChild(navigation);
 
     this.updateUI();

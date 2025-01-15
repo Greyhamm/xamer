@@ -202,3 +202,66 @@
   margin: 0 auto;
   padding: 2rem;
 }
+
+/* Add to renderer/styles/components/exam.css */
+
+.question-media {
+  max-width: 500px;
+  margin: 1rem auto;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.written-answer {
+  width: 100%;
+  min-height: 150px;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.option-container {
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.2s;
+}
+
+.option-container:hover {
+  background-color: #f8f9fa;
+}
+
+.option-container input[type="radio"] {
+  margin-right: 0.75rem;
+}
+
+.option-container label {
+  flex: 1;
+  margin: 0;
+  cursor: pointer;
+}
+
+.word-count {
+  font-size: 0.875rem;
+  color: #666;
+  margin-top: 0.5rem;
+}
+
+.word-count.exceeded {
+  color: #dc3545;
+}
+
+.question-prompt {
+  margin-bottom: 1.5rem;
+}
+
+.answer-container {
+  margin-top: 1rem;
+}
