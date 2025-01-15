@@ -47,7 +47,7 @@ expressApp.use('/api', codeExecutionRoutes);
 expressApp.use('/api/media', mediaRoutes); 
 expressApp.use('/api', classRoutes);
 expressApp.use('/api/submissions', submissionRoutes);
-
+expressApp.use('/api', submissionRoutes);
 // Serve static files from uploads directory
 expressApp.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 

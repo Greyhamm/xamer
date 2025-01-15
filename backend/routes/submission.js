@@ -21,7 +21,14 @@ router.get(
   protect,
   SubmissionController.getSubmission
 );
+// Ensure this route is properly defined
+router.get(
+  '/submissions', 
+  protect,  // Ensure authentication middleware is applied
+  SubmissionController.getSubmissions  // Make sure this method exists in the controller
+);
 
+module.exports = router;
 router.post(
   '/submissions/:id/grade',
   protect,

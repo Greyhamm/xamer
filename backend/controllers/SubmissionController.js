@@ -94,27 +94,31 @@ class SubmissionController {
   // @desc    Get all submissions
   // @route   GET /api/submissions
   // @access  Private
-  getSubmissions = asyncHandler(async (req, res) => {
-    let query;
+// backend/controllers/SubmissionController.js
+getSubmissions = asyncHandler(async (req, res) => {
+  let query;
 
-    if (req.user.role === 'teacher') {
-      const teacherExams = await Exam.find({ creator: req.user.userId });
-      const examIds = teacherExams.map(exam => exam._id);
-      query = ExamSubmission.find({ exam: { $in: examIds } });
-    } else {
-      query = ExamSubmission.find({ student: req.user.userId });
-    }
+  // If teacher, get submissions for their exams
+  if (req.user.role === 'teacher') {
+    const teacherExams = await Exam.find({ creator: req.user.userId });
+    const examIds = teacherExams.map(exam => exam._id);
+    query = ExamSubmission.find({ exam: { $in: examIds } });
+  } else {
+    // If student, get their own submissions
+    query = ExamSubmission.find({ student: req.user.userId });
+  }
 
-    const submissions = await query
-      .populate('exam', 'title')
-      .populate('student', 'username email');
+  const submissions = await query
+    .populate('exam', 'title')
+    .populate('student', 'username email')
+    .lean();
 
-    res.status(200).json({
-      success: true,
-      count: submissions.length,
-      data: submissions
-    });
+  res.status(200).json({
+    success: true,
+    count: submissions.length,
+    data: submissions
   });
+});
 
   // @desc    Get single submission
   // @route   GET /api/submissions/:id
