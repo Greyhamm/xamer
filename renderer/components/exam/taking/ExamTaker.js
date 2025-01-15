@@ -2,6 +2,7 @@ import MultipleChoiceRenderer from './QuestionTypes/MultipleChoiceRenderer.js';
 import WrittenRenderer from './QuestionTypes/WrittenRenderer.js';
 import CodingRenderer from './QuestionTypes/CodingRenderer.js';
 
+
 export default class ExamTaker {
   constructor() {
     this.state = {
@@ -21,43 +22,6 @@ export default class ExamTaker {
 
     this.currentRenderer = null;
   }
-
-  setState(newState) {
-    this.state = { ...this.state, ...newState };
-    this.updateUI();
-  }
-
-  updateUI() {
-    if (!this.container) return;
-
-    // Update progress indicator
-    if (this.progressElement) {
-      const progress = ((this.state.currentQuestionIndex + 1) / this.state.exam.questions.length) * 100;
-      this.progressElement.style.width = `${progress}%`;
-      this.progressElement.textContent = `Question ${this.state.currentQuestionIndex + 1} of ${this.state.exam.questions.length}`;
-    }
-
-    // Update navigation buttons
-    if (this.prevButton) {
-      this.prevButton.disabled = this.state.currentQuestionIndex === 0;
-    }
-    if (this.nextButton) {
-      const isLast = this.state.currentQuestionIndex === this.state.exam.questions.length - 1;
-      this.nextButton.textContent = isLast ? 'Submit Exam' : 'Next Question';
-      this.nextButton.disabled = this.state.loading;
-    }
-
-    // Show error message if any
-    if (this.errorElement) {
-      this.errorElement.style.display = this.state.error ? 'block' : 'none';
-      if (this.state.error) {
-        this.errorElement.textContent = this.state.error;
-      }
-    }
-
-    this.renderCurrentQuestion();
-  }
-
   async loadExam(examId) {
     try {
       this.setState({ loading: true, error: null });
@@ -105,48 +69,38 @@ export default class ExamTaker {
     return true;
   }
 
-  handleAnswerChange(answer) {
-    const { answers } = this.state;
-    const currentQuestion = this.state.exam.questions[this.state.currentQuestionIndex];
-    
-    // Ensure we have all required fields
-    const fullAnswer = {
-      ...answer,
-      questionId: currentQuestion._id,
-      questionType: currentQuestion.type,
-      timeSpent: Math.floor((Date.now() - this.state.timeStarted) / 1000)
-    };
+  setState(newState) {
+    this.state = { ...this.state, ...newState };
+    if (this.container) {
+      this.updateUI();
+    }
+  }
 
-    // Store the answer
-    answers.set(currentQuestion._id, fullAnswer);
-    
-    // Log the stored answer for debugging
-    console.log('Stored answer:', {
-      questionId: fullAnswer.questionId,
-      type: fullAnswer.questionType,
-      answer: fullAnswer.answer,
-      answerLength: fullAnswer.answer ? fullAnswer.answer.length : 0
-    });
+  updateUI() {
+    if (!this.container) return;
 
-    this.setState({ answers });
+    // Update progress
+    if (this.progressElement) {
+      const progress = ((this.state.currentQuestionIndex + 1) / this.state.exam.questions.length) * 100;
+      this.progressElement.style.width = `${progress}%`;
+      this.progressElement.textContent = `Question ${this.state.currentQuestionIndex + 1} of ${this.state.exam.questions.length}`;
+    }
+
+    // Update navigation buttons
+    if (this.prevButton) {
+      this.prevButton.disabled = this.state.currentQuestionIndex === 0;
+    }
+    if (this.nextButton) {
+      const isLast = this.state.currentQuestionIndex === this.state.exam.questions.length - 1;
+      this.nextButton.textContent = isLast ? 'Submit Exam' : 'Next Question';
+    }
+
+    // Update current question
+    this.renderCurrentQuestion();
   }
 
   renderCurrentQuestion() {
     if (!this.questionContainer) return;
-
-    // Store current answer if it exists
-    if (this.currentRenderer?.getValue) {
-      const currentAnswer = this.currentRenderer.getValue();
-      if (currentAnswer && currentAnswer.answer) {
-        this.state.answers.set(currentAnswer.questionId, currentAnswer);
-      }
-    }
-
-    // Clean up previous renderer
-    if (this.currentRenderer?.dispose) {
-      this.currentRenderer.dispose();
-    }
-
     this.questionContainer.innerHTML = '';
 
     const question = this.state.exam.questions[this.state.currentQuestionIndex];
@@ -160,20 +114,48 @@ export default class ExamTaker {
 
     const existingAnswer = this.state.answers.get(question._id);
 
-    // Create new renderer without triggering immediate state update
     this.currentRenderer = new RendererClass(question, {
       initialAnswer: existingAnswer,
       onChange: (answer) => {
-        // Only update if answer actually changed
-        const current = this.state.answers.get(answer.questionId);
-        if (!current || current.answer !== answer.answer) {
-          this.handleAnswerChange(answer);
-        }
+        const fullAnswer = {
+          ...answer,
+          questionId: question._id,
+          timeSpent: Math.floor((Date.now() - this.state.timeStarted) / 1000)
+        };
+        this.state.answers.set(question._id, fullAnswer);
       }
     });
 
     this.questionContainer.appendChild(this.currentRenderer.render());
-}
+  }
+
+  async loadExam(examId) {
+    try {
+      this.setState({ loading: true, error: null });
+      const examResponse = await window.api.getExamById(examId);
+      
+      if (!examResponse.success) {
+        throw new Error(examResponse.error || 'Failed to load exam');
+      }
+
+      this.setState({ 
+        exam: examResponse.data, 
+        loading: false,
+        currentQuestionIndex: 0 
+      });
+
+      return true;
+    } catch (error) {
+      this.setState({ error: error.message, loading: false });
+      return false;
+    }
+  }
+
+  navigateToQuestion(index) {
+    if (index >= 0 && index < this.state.exam.questions.length) {
+      this.setState({ currentQuestionIndex: index });
+    }
+  }
 
   async submitExam() {
     try {
@@ -226,12 +208,24 @@ export default class ExamTaker {
     }
   }
 
-  navigateToQuestion(index) {
-    if (index >= 0 && index < this.state.exam.questions.length) {
-      this.setState({ currentQuestionIndex: index });
-    }
+  handleAnswerChange(answer) {
+    const { answers } = this.state;
+    const currentQuestion = this.state.exam.questions[this.state.currentQuestionIndex];
+    
+    // Ensure we have all required fields
+    const fullAnswer = {
+        ...answer,
+        questionId: currentQuestion._id,
+        questionType: currentQuestion.type,
+        timeSpent: Math.floor((Date.now() - this.state.timeStarted) / 1000)
+    };
+  
+    // Store the answer
+    answers.set(currentQuestion._id, fullAnswer);
+    
+    // Update state but don't trigger full re-render
+    this.setState({ answers });
   }
-
   render() {
     this.container = document.createElement('div');
     this.container.className = 'exam-taker-container';
@@ -250,12 +244,6 @@ export default class ExamTaker {
       this.container.innerHTML = '<div class="error">No exam loaded</div>';
       return this.container;
     }
-
-    // Error message container
-    this.errorElement = document.createElement('div');
-    this.errorElement.className = 'error-message';
-    this.errorElement.style.display = 'none';
-    this.container.appendChild(this.errorElement);
 
     // Exam header
     const header = document.createElement('div');
@@ -284,7 +272,9 @@ export default class ExamTaker {
     this.prevButton.className = 'btn btn-secondary';
     this.prevButton.textContent = 'Previous';
     this.prevButton.addEventListener('click', () => {
-      this.navigateToQuestion(this.state.currentQuestionIndex - 1);
+      if (this.state.currentQuestionIndex > 0) {
+        this.setState({ currentQuestionIndex: this.state.currentQuestionIndex - 1 });
+      }
     });
 
     this.nextButton = document.createElement('button');
@@ -294,7 +284,7 @@ export default class ExamTaker {
       if (isLast) {
         this.submitExam();
       } else {
-        this.navigateToQuestion(this.state.currentQuestionIndex + 1);
+        this.setState({ currentQuestionIndex: this.state.currentQuestionIndex + 1 });
       }
     });
 
@@ -302,7 +292,9 @@ export default class ExamTaker {
     navigation.appendChild(this.nextButton);
     this.container.appendChild(navigation);
 
-    this.updateUI();
+    // Initial render of current question
+    this.renderCurrentQuestion();
+
     return this.container;
   }
 }

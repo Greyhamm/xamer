@@ -3,7 +3,6 @@ import BaseQuestionRenderer from './BaseQuestionRenderer.js';
 export default class WrittenRenderer extends BaseQuestionRenderer {
   constructor(question, options = {}) {
     super(question, options);
-    // Initialize answer as string
     this.answer = options.initialAnswer?.answer || '';
   }
 
@@ -23,6 +22,7 @@ export default class WrittenRenderer extends BaseQuestionRenderer {
   getValue() {
     return {
       questionType: 'Written',
+      questionId: this.question._id,
       answer: this.answer
     };
   }
@@ -49,26 +49,36 @@ export default class WrittenRenderer extends BaseQuestionRenderer {
 
     const textarea = document.createElement('textarea');
     textarea.className = 'written-answer';
-    textarea.value = this.answer;
+    textarea.value = this.answer || '';
     textarea.placeholder = 'Enter your answer here...';
     textarea.rows = 6;
 
+    // Use a debounced update for better performance
+    let updateTimeout;
     textarea.addEventListener('input', (e) => {
-      this.answer = e.target.value;
-      this.updateWordCount();
-      this.setState(this.getValue());
+        e.stopPropagation();
+        this.answer = e.target.value;
+        
+        if (updateTimeout) {
+            clearTimeout(updateTimeout);
+        }
+        
+        updateTimeout = setTimeout(() => {
+            this.updateWordCount();
+            this.setState(this.getValue());
+        }, 100);
     });
 
     if (this.question.maxWords) {
-      this.wordCountElement = document.createElement('div');
-      this.wordCountElement.className = 'word-count';
-      answerContainer.appendChild(this.wordCountElement);
-      this.updateWordCount();
+        this.wordCountElement = document.createElement('div');
+        this.wordCountElement.className = 'word-count';
+        answerContainer.appendChild(this.wordCountElement);
+        this.updateWordCount();
     }
 
     answerContainer.appendChild(textarea);
     container.appendChild(answerContainer);
 
     return container;
-  }
+}
 }
