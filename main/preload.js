@@ -44,7 +44,25 @@ class PreloadBridge {
     const token = localStorage.getItem('token');
     console.log('Getting auth header, token exists:', !!token);
     return token ? { 'Authorization': `Bearer ${token}` } : {};
-}
+  }
+
+  async executeCode(endpoint, data) {
+    try {
+      const response = await this.fetchApi({
+        endpoint: `/execute/${endpoint}`,
+        method: 'POST',
+        data: { code: data.code, input: data.input },
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+      return { success: true, data: response };
+    } catch (error) {
+      console.error(`Code execution error (${endpoint}):`, error);
+      return { success: false, error: error.message };
+    }
+  }
 
   async login(options) {
     try {
@@ -70,7 +88,6 @@ class PreloadBridge {
       };
     }
   }
-
 
   async fetchApi({ endpoint, data = {}, method = 'POST', headers = {} } = {}) {
     const defaultHeaders = {
@@ -106,10 +123,16 @@ class PreloadBridge {
 
   exposeApi() {
     contextBridge.exposeInMainWorld('api', {
+      // Existing methods...
       signup: (options) => this.fetchApi({ ...options }),
       login: (options) => this.login(options),
       getProfile: () => this.fetchApi({ endpoint: '/auth/profile', method: 'GET' }),
       
+      // Add code execution methods
+      executeJavaScript: (data) => this.executeCode('javascript', data),
+      executePython: (data) => this.executeCode('python', data),
+      executeJava: (data) => this.executeCode('java', data),
+
       // Class related endpoints
       createClass: (options) => this.fetchApi({
         endpoint: '/classes',
@@ -136,7 +159,7 @@ class PreloadBridge {
         method: 'POST',
         data: { studentId }
       }),
-        // Student-specific endpoints
+      // Student-specific endpoints
       getExams: () => this.fetchApi({
         endpoint: '/exams',
         method: 'GET',
@@ -176,6 +199,8 @@ class PreloadBridge {
         method: 'GET',
         headers: this.getAuthHeader()
       }),
+      
+
       // Exam related endpoints
       createExam: async (examData) => {
         console.log('Creating exam, user data:', this.userData);

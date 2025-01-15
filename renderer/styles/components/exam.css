@@ -265,3 +265,57 @@
 .answer-container {
   margin-top: 1rem;
 }
+
+/* code questions */
+
+.output-container {
+  margin: 1rem 0;
+  min-height: 2rem;
+}
+
+.code-output {
+  background: #1e1e1e;
+  border-radius: 4px;
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.code-output h4 {
+  color: #e0e0e0;
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.code-output pre {
+  margin: 0;
+  padding: 0.5rem;
+  background: #2d2d2d;
+  border-radius: 4px;
+  color: #ffffff;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.execution-status {
+  padding: 0.75rem;
+  background: #f0f0f0;
+  border-radius: 4px;
+  color: #666;
+  text-align: center;
+  margin: 1rem 0;
+}
+
+.execution-error {
+  padding: 0.75rem;
+  background: #fee2e2;
+  border-radius: 4px;
+  color: #dc2626;
+  margin: 1rem 0;
+}
+
+.test-results-list {
+  margin-top: 1rem;
+}
