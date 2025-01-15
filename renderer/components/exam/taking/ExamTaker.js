@@ -279,13 +279,16 @@ export default class ExamTaker {
 
     this.nextButton = document.createElement('button');
     this.nextButton.className = 'btn btn-primary';
+    // Set initial text based on whether it's the last question
+    const isLast = this.state.currentQuestionIndex === this.state.exam.questions.length - 1;
+    this.nextButton.textContent = isLast ? 'Submit Exam' : 'Next Question';
     this.nextButton.addEventListener('click', () => {
-      const isLast = this.state.currentQuestionIndex === this.state.exam.questions.length - 1;
-      if (isLast) {
-        this.submitExam();
-      } else {
-        this.setState({ currentQuestionIndex: this.state.currentQuestionIndex + 1 });
-      }
+        const isLast = this.state.currentQuestionIndex === this.state.exam.questions.length - 1;
+        if (isLast) {
+            this.submitExam();
+        } else {
+            this.setState({ currentQuestionIndex: this.state.currentQuestionIndex + 1 });
+        }
     });
 
     navigation.appendChild(this.prevButton);
