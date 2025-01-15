@@ -10,6 +10,7 @@ const ErrorResponse = require('../utils/errorResponse');
 const MultipleChoiceQuestion = require('../models/questions/MultipleChoiceQuestion');
 const WrittenQuestion = require('../models/questions/WrittenQuestion');
 const CodingQuestion = require('../models/questions/CodingQuestion');
+const asyncHandler = require('../utils/asyncHandler');
 class ExamController {
     async createExam(req) {
         try {
@@ -351,7 +352,59 @@ class ExamController {
           next(error);
         }
       }
+
+      // backend/controllers/ExamController.js
+
+// Add this method to the ExamController class
+submitExam = asyncHandler(async (req, res) => {
+    const { examId } = req.params;
+    const { answers } = req.body;
+  
+    try {
+      // Validate exam exists and is published
+      const exam = await Exam.findOne({
+        _id: examId,
+        status: 'published'
+      });
+  
+      if (!exam) {
+        throw new ErrorResponse('Exam not found or not published', 404);
+      }
+  
+      // Check for existing submission
+      const existingSubmission = await ExamSubmission.findOne({
+        exam: examId,
+        student: req.user.userId
+      });
+  
+      if (existingSubmission) {
+        throw new ErrorResponse('You have already submitted this exam', 400);
+      }
+  
+      // Create submission
+      const submission = await ExamSubmission.create({
+        exam: examId,
+        student: req.user.userId,
+        answers: answers.map(answer => ({
+          question: answer.questionId,
+          answer: answer.answer,
+          timeSpent: answer.timeSpent
+        })),
+        status: 'submitted',
+        submitTime: Date.now()
+      });
+  
+      res.status(201).json({
+        success: true,
+        data: submission
+      });
+    } catch (error) {
+      console.error('Submit exam error:', error);
+      throw error;
+    }
+  });
 }
+
 
 
 module.exports = { ExamController };

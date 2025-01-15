@@ -9,6 +9,7 @@ const examRoutes = require('../backend/routes/exam');
 const codeExecutionRoutes = require('../backend/routes/codeExecution');
 const mediaRoutes = require('../backend/routes/media');
 const authRoutes = require('../backend/routes/auth');
+const submissionRoutes = require('../backend/routes/submission');
 const ipcAsyncHandler = require('../backend/utils/ipcAsyncHandler');
 const dotenv = require('dotenv');
 dotenv.config();
@@ -16,6 +17,7 @@ const classRoutes = require('../backend/routes/class');
 // Import controllers
 const { ExamController } = require('../backend/controllers/ExamController');
 const examController = new ExamController();
+
 
 // Initialize Express App
 const expressApp = express();
@@ -44,6 +46,7 @@ expressApp.use('/api', examRoutes);
 expressApp.use('/api', codeExecutionRoutes);
 expressApp.use('/api/media', mediaRoutes); 
 expressApp.use('/api', classRoutes);
+expressApp.use('/api/submissions', submissionRoutes);
 
 // Serve static files from uploads directory
 expressApp.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));

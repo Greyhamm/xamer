@@ -156,10 +156,13 @@ class PreloadBridge {
       }),
 
       submitExam: (examId, answers) => this.fetchApi({
-          endpoint: `/exams/${examId}/submit`,
-          method: 'POST',
-          data: { answers },
-          headers: this.getAuthHeader()
+        endpoint: `/submissions/exams/${examId}/submit`,
+        method: 'POST',
+        data: { answers },
+        headers: {
+            'Content-Type': 'application/json',
+            ...this.getAuthHeader()
+        }
       }),
 
       getSubmissions: () => this.fetchApi({
