@@ -52,13 +52,6 @@ router.get(
 
 
 router.post(
-  '/exams/:id/submit',
-  protect,
-  authorize('student'),
-  (req, res, next) => examController.submitExam(req, res, next)
-);
-
-router.post(
   '/exams/submissions/:id/grade',
   protect,
   authorize('teacher'),
