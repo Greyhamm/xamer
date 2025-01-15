@@ -1,21 +1,42 @@
 class SubmissionAPI {
-    static async getSubmissions() {
+  static async getSubmissions() {
       try {
-        return await window.api.getSubmissions();
+          const response = await window.api.getSubmissions();
+          if (!response.success) {
+              throw new Error(response.error || 'Failed to fetch submissions');
+          }
+          return response;
       } catch (error) {
-        console.error('Get submissions error:', error);
-        throw new Error(error.message || 'Failed to fetch submissions');
+          console.error('Get submissions error:', error);
+          throw error;
       }
-    }
-  
-    static async gradeSubmission(submissionId, grades) {
-      try {
-        return await window.api.gradeSubmission(submissionId, grades);
-      } catch (error) {
-        console.error('Grade submission error:', error);
-        throw new Error(error.message || 'Failed to grade submission');
-      }
-    }
   }
-  
-  export default SubmissionAPI;
+
+  static async getSubmissionById(submissionId) {
+      try {
+          const response = await window.api.getSubmissionById(submissionId);
+          if (!response.success) {
+              throw new Error(response.error || 'Failed to fetch submission');
+          }
+          return response.data;
+      } catch (error) {
+          console.error('Get submission by ID error:', error);
+          throw error;
+      }
+  }
+
+  static async gradeSubmission(submissionId, grades) {
+      try {
+          const response = await window.api.gradeSubmission(submissionId, grades);
+          if (!response.success) {
+              throw new Error(response.error || 'Failed to grade submission');
+          }
+          return response.data;
+      } catch (error) {
+          console.error('Grade submission error:', error);
+          throw error;
+      }
+  }
+}
+
+export default SubmissionAPI;

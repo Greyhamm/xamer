@@ -166,17 +166,17 @@ export default class ClassView {
             </div>
             <p class="section-description">Manage and monitor all exams for this class</p>
         `;
-
+    
         const createExamBtn = header.querySelector('.create-exam-btn');
         createExamBtn.addEventListener('click', () => {
             AppState.navigateTo('examCreator', { classId: this.state.classId });
         });
-
+    
         const examGrid = document.createElement('div');
         examGrid.className = 'exam-grid';
-
+    
         const exams = this.state.classData?.exams || [];
-
+    
         if (!exams.length) {
             examGrid.innerHTML = `
                 <div class="empty-state">
@@ -186,10 +186,8 @@ export default class ClassView {
             `;
         } else {
             exams.forEach(exam => {
-                // Simply count the length of the questions array
                 const questionCount = exam.questions?.length || 0;
-                console.log(`Exam ${exam._id} question count:`, questionCount, 'Questions array:', exam.questions);
-
+    
                 const examCard = document.createElement('div');
                 examCard.className = 'exam-card';
                 examCard.innerHTML = `
@@ -214,7 +212,7 @@ export default class ClassView {
                             `<button class="btn btn-secondary submissions-btn" data-exam-id="${exam._id}">View Submissions</button>`}
                     </div>
                 `;
-
+    
                 // Add event listeners
                 const publishBtn = examCard.querySelector('.publish-btn');
                 if (publishBtn) {
@@ -228,11 +226,27 @@ export default class ClassView {
                         }
                     });
                 }
-
+    
+                // Add event listener for submissions
+                const submissionsBtn = examCard.querySelector('.submissions-btn');
+                if (submissionsBtn) {
+                    submissionsBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const examId = e.target.dataset.examId;
+                        console.log('View submissions for exam:', examId);
+                        
+                        // Navigate to submissions view with exam ID
+                        AppState.navigateTo('submissionsList', { 
+                            examId: examId, 
+                            classId: this.state.classId 
+                        });
+                    });
+                }
+    
                 examGrid.appendChild(examCard);
             });
         }
-
+    
         section.appendChild(header);
         section.appendChild(examGrid);
         return section;

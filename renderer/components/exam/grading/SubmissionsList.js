@@ -1,175 +1,153 @@
-import SubmissionAPI from '../../../services/api/submissionAPI.js';
-import GradingView from './GradingView.js';
-import { formatDate } from '../../../services/utils/formating.js';
-
 export default class SubmissionsList {
-  constructor() {
-    this.state = {
-      submissions: [],
-      loading: true,
-      error: null,
-      filters: {
-        status: 'all',
-        search: ''
+  constructor(options = {}) {
+      this.state = {
+          submissions: [],
+          loading: true,
+          error: null,
+          examId: options.examId,
+          classId: options.classId,
+          filters: {
+              status: 'all',
+              search: ''
+          }
+      };
+
+      // Fetch submissions when component is created
+      this.fetchSubmissions();
+  }
+
+  async fetchSubmissions() {
+      try {
+          console.log('Fetching submissions with params:', {
+              examId: this.state.examId,
+              classId: this.state.classId
+          });
+
+          const response = await window.api.getSubmissions();
+          
+          console.log('Raw submissions response:', response);
+
+          // Ensure response has data and success flag
+          if (!response || !response.data) {
+              throw new Error('No submissions data received');
+          }
+
+          // Filter submissions by exam ID if provided
+          let submissions = response.data || [];
+          if (this.state.examId) {
+              submissions = submissions.filter(
+                  submission => submission.exam?._id === this.state.examId
+              );
+          }
+
+          this.setState({ 
+              submissions, 
+              loading: false 
+          });
+      } catch (error) {
+          console.error('Error fetching submissions:', error);
+          this.setState({
+              error: error.message || 'Failed to fetch submissions',
+              loading: false,
+              submissions: []
+          });
       }
-    };
-  }
-
-  setState(newState) {
-    this.state = { ...this.state, ...newState };
-    this.updateUI();
-  }
-
-  async loadSubmissions() {
-    try {
-      const submissions = await SubmissionAPI.getSubmissions();
-      this.setState({ submissions, loading: false });
-    } catch (error) {
-      this.setState({ error: error.message, loading: false });
-    }
-  }
-
-  filterSubmissions() {
-    let filtered = [...this.state.submissions];
-
-    if (this.state.filters.status !== 'all') {
-      filtered = filtered.filter(sub => sub.status === this.state.filters.status);
-    }
-
-    if (this.state.filters.search) {
-      const search = this.state.filters.search.toLowerCase();
-      filtered = filtered.filter(sub => 
-        sub.student.username.toLowerCase().includes(search) ||
-        sub.exam.title.toLowerCase().includes(search)
-      );
-    }
-
-    return filtered;
-  }
-
-  openGradingView(submission) {
-    const mainContent = document.querySelector('#main-content');
-    const gradingView = new GradingView(submission, () => {
-      this.loadSubmissions();
-      this.render();
-    });
-    mainContent.innerHTML = '';
-    mainContent.appendChild(gradingView.render());
   }
 
   render() {
-    const container = document.createElement('div');
-    container.className = 'submissions-list-container';
+      this.container = document.createElement('div');
+      this.container.className = 'submissions-list-container';
 
-    // Header
-    const header = document.createElement('div');
-    header.className = 'submissions-header';
-    header.innerHTML = `<h2>Exam Submissions</h2>`;
+      // Header
+      const header = document.createElement('div');
+      header.className = 'submissions-header';
+      
+      // Error handling
+      if (this.state.error) {
+          header.innerHTML = `<h2>Error</h2>`;
+          const errorMessage = document.createElement('div');
+          errorMessage.className = 'error-message';
+          errorMessage.textContent = this.state.error;
+          this.container.appendChild(header);
+          this.container.appendChild(errorMessage);
+          return this.container;
+      }
 
-    // Filters
-    const filtersContainer = document.createElement('div');
-    filtersContainer.className = 'submissions-filters';
+      // Loading state
+      if (this.state.loading) {
+          header.innerHTML = `<h2>Loading Submissions...</h2>`;
+          this.container.appendChild(header);
+          return this.container;
+      }
 
-    const statusSelect = document.createElement('select');
-    statusSelect.className = 'filter-select';
-    statusSelect.innerHTML = `
-      <option value="all">All Status</option>
-      <option value="submitted">Pending Grading</option>
-      <option value="graded">Graded</option>
-    `;
-    statusSelect.value = this.state.filters.status;
-    statusSelect.addEventListener('change', (e) => {
-      this.setState({
-        filters: { ...this.state.filters, status: e.target.value }
-      });
-    });
+      // Normal rendering
+      header.innerHTML = `<h2>Exam Submissions</h2>`;
+      this.container.appendChild(header);
 
-    const searchInput = document.createElement('input');
-    searchInput.type = 'text';
-    searchInput.className = 'filter-search';
-    searchInput.placeholder = 'Search by student or exam...';
-    searchInput.value = this.state.filters.search;
-    searchInput.addEventListener('input', (e) => {
-      this.setState({
-        filters: { ...this.state.filters, search: e.target.value }
-      });
-    });
+      // Submissions table
+      const table = document.createElement('table');
+      table.className = 'submissions-table';
+      
+      // If no submissions
+      if (this.state.submissions.length === 0) {
+          const noSubmissionsMessage = document.createElement('div');
+          noSubmissionsMessage.className = 'no-submissions-message';
+          noSubmissionsMessage.textContent = 'No submissions found.';
+          this.container.appendChild(noSubmissionsMessage);
+          return this.container;
+      }
 
-    filtersContainer.appendChild(statusSelect);
-    filtersContainer.appendChild(searchInput);
-
-    // Submissions table
-    const table = document.createElement('table');
-    table.className = 'submissions-table';
-    
-    const thead = document.createElement('thead');
-    thead.innerHTML = `
-      <tr>
-        <th>Student</th>
-        <th>Exam</th>
-        <th>Submitted</th>
-        <th>Status</th>
-        <th>Score</th>
-        <th>Actions</th>
-      </tr>
-    `;
-
-    const tbody = document.createElement('tbody');
-    const filteredSubmissions = this.filterSubmissions();
-
-    if (this.state.loading) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="6" class="loading-cell">Loading submissions...</td>
-        </tr>
+      // Rest of the rendering remains the same as in the previous implementation
+      table.innerHTML = `
+          <thead>
+              <tr>
+                  <th>Student</th>
+                  <th>Exam</th>
+                  <th>Submitted</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+              </tr>
+          </thead>
+          <tbody>
+              ${this.state.submissions.map(submission => `
+                  <tr>
+                      <td>${submission.student?.username || 'Unknown'}</td>
+                      <td>${submission.exam?.title || 'Unknown Exam'}</td>
+                      <td>${submission.submitTime ? new Date(submission.submitTime).toLocaleDateString() : 'N/A'}</td>
+                      <td>
+                          <span class="status-badge ${submission.status}">
+                              ${submission.status}
+                          </span>
+                      </td>
+                      <td>
+                          <button class="btn btn-${submission.status === 'submitted' ? 'primary' : 'secondary'} grade-btn" 
+                                  data-submission-id="${submission._id}">
+                              ${submission.status === 'submitted' ? 'Grade' : 'Review'}
+                          </button>
+                      </td>
+                  </tr>
+              `).join('')}
+          </tbody>
       `;
-    } else if (this.state.error) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="6" class="error-cell">${this.state.error}</td>
-        </tr>
-      `;
-    } else if (filteredSubmissions.length === 0) {
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="6" class="empty-cell">No submissions found</td>
-        </tr>
-      `;
-    } else {
-      filteredSubmissions.forEach(submission => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${submission.student.username}</td>
-          <td>${submission.exam.title}</td>
-          <td>${formatDate(submission.submittedAt)}</td>
-          <td>
-            <span class="status-badge ${submission.status}">
-              ${submission.status}
-            </span>
-          </td>
-          <td>${submission.totalScore !== null ? `${submission.totalScore}%` : '-'}</td>
-          <td>
-            <button class="btn btn-${submission.status === 'graded' ? 'secondary' : 'primary'}">
-              ${submission.status === 'graded' ? 'Review' : 'Grade'}
-            </button>
-          </td>
-        `;
 
-        const actionButton = row.querySelector('button');
-        actionButton.addEventListener('click', () => this.openGradingView(submission));
-
-        tbody.appendChild(row);
+      // Add event listeners for grade/review buttons
+      table.addEventListener('click', (e) => {
+          const gradeButton = e.target.closest('.grade-btn');
+          if (gradeButton) {
+              const submissionId = gradeButton.dataset.submissionId;
+              console.log('Grade/Review submission:', submissionId);
+              
+              // Navigate to grading view
+              AppState.navigateTo('gradingView', { 
+                  submissionId,
+                  examId: this.state.examId,
+                  classId: this.state.classId
+              });
+          }
       });
-    }
 
-    table.appendChild(thead);
-    table.appendChild(tbody);
+      this.container.appendChild(table);
 
-    // Assemble container
-    container.appendChild(header);
-    container.appendChild(filtersContainer);
-    container.appendChild(table);
-
-    return container;
+      return this.container;
   }
 }

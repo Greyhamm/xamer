@@ -80,7 +80,7 @@ async renderView(view) {
             component = new GradingView(view.params.submissionId);
             break;
           case 'submissionsList':
-            component = new SubmissionsList();
+            component = new SubmissionsList(view.params);
             break;
           case 'classView':
             component = new ClassView(view.params.classId);

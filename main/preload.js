@@ -193,6 +193,12 @@ class PreloadBridge {
           method: 'GET',
           headers: this.getAuthHeader()
       }),
+
+      getSubmissionById: (submissionId) => this.fetchApi({
+        endpoint: `/submissions/${submissionId}`,
+        method: 'GET',
+        headers: this.getAuthHeader()
+      }),
      
       getExamById: (examId) => this.fetchApi({
         endpoint: `/exams/${examId}`,
