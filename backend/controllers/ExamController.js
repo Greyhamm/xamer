@@ -10,6 +10,7 @@ const ErrorResponse = require('../utils/errorResponse');
 const MultipleChoiceQuestion = require('../models/questions/MultipleChoiceQuestion');
 const WrittenQuestion = require('../models/questions/WrittenQuestion');
 const CodingQuestion = require('../models/questions/CodingQuestion');
+const asyncHandler = require('../utils/asyncHandler');
 class ExamController {
     async createExam(req) {
         try {
@@ -272,7 +273,138 @@ class ExamController {
             throw error;
         }
     }
+
+    async getExams(req, res, next) {
+        try {
+            console.log('Getting exams for user:', req.user);
+    
+            let exams;
+            if (req.user.role === 'teacher') {
+                // For teachers, get all exams they've created
+                exams = await Exam.find({ creator: req.user.userId })
+                    .populate('questions')
+                    .populate('class', 'name')
+                    .lean();
+            } else if (req.user.role === 'student') {
+                // For students, get published exams
+                exams = await Exam.find({ 
+                    status: 'published',
+                    // Optionally, you might want to filter by class if needed
+                    // class: { $in: studentClasses }  // This would require additional logic to get student's classes
+                })
+                    .populate('questions')
+                    .populate('class', 'name')
+                    .lean();
+            } else {
+                throw new ErrorResponse('Invalid user role', 403);
+            }
+    
+            res.status(200).json({
+                success: true,
+                count: exams.length,
+                data: exams
+            });
+        } catch (error) {
+            console.error('Get exams error:', error);
+            next(error);
+        }
+    }
+
+    async getExam(req, res, next) {
+        try {
+          const examId = req.params.id;
+          
+          // Determine access based on user role
+          let exam;
+          if (req.user.role === 'teacher') {
+            // Teachers can see any exam they created
+            exam = await Exam.findOne({ 
+              _id: examId, 
+              creator: req.user.userId 
+            })
+            .populate('questions')
+            .populate('class', 'name')
+            .lean();
+          } else if (req.user.role === 'student') {
+            // Students can only see published exams
+            exam = await Exam.findOne({ 
+              _id: examId, 
+              status: 'published' 
+            })
+            .populate('questions')
+            .populate('class', 'name')
+            .lean();
+          }
+      
+          if (!exam) {
+            return res.status(404).json({
+              success: false,
+              error: 'Exam not found or not accessible'
+            });
+          }
+      
+          res.status(200).json({
+            success: true,
+            data: exam
+          });
+        } catch (error) {
+          console.error('Get exam error:', error);
+          next(error);
+        }
+      }
+
+      // backend/controllers/ExamController.js
+
+// Add this method to the ExamController class
+submitExam = asyncHandler(async (req, res) => {
+    const { examId } = req.params;
+    const { answers } = req.body;
+  
+    try {
+      // Validate exam exists and is published
+      const exam = await Exam.findOne({
+        _id: examId,
+        status: 'published'
+      });
+  
+      if (!exam) {
+        throw new ErrorResponse('Exam not found or not published', 404);
+      }
+  
+      // Check for existing submission
+      const existingSubmission = await ExamSubmission.findOne({
+        exam: examId,
+        student: req.user.userId
+      });
+  
+      if (existingSubmission) {
+        throw new ErrorResponse('You have already submitted this exam', 400);
+      }
+  
+      // Create submission
+      const submission = await ExamSubmission.create({
+        exam: examId,
+        student: req.user.userId,
+        answers: answers.map(answer => ({
+          question: answer.questionId,
+          answer: answer.answer,
+          timeSpent: answer.timeSpent
+        })),
+        status: 'submitted',
+        submitTime: Date.now()
+      });
+  
+      res.status(201).json({
+        success: true,
+        data: submission
+      });
+    } catch (error) {
+      console.error('Submit exam error:', error);
+      throw error;
+    }
+  });
 }
+
 
 
 module.exports = { ExamController };

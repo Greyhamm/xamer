@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { ExamController } = require('../controllers/ExamController');
 const { protect, authorize } = require('../middleware/auth');
+const asyncHandler = require('../utils/asyncHandler');
 
 // Initialize controller
 const examController = new ExamController();
@@ -49,13 +50,6 @@ router.get(
 );
 
 
-
-router.post(
-  '/exams/:id/submit',
-  protect,
-  authorize('student'),
-  (req, res, next) => examController.submitExam(req, res, next)
-);
 
 router.post(
   '/exams/submissions/:id/grade',

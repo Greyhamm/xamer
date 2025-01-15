@@ -44,7 +44,25 @@ class PreloadBridge {
     const token = localStorage.getItem('token');
     console.log('Getting auth header, token exists:', !!token);
     return token ? { 'Authorization': `Bearer ${token}` } : {};
-}
+  }
+
+  async executeCode(endpoint, data) {
+    try {
+      const response = await this.fetchApi({
+        endpoint: `/execute/${endpoint}`,
+        method: 'POST',
+        data: { code: data.code, input: data.input },
+        headers: {
+          'Content-Type': 'application/json',
+          ...this.getAuthHeader()
+        }
+      });
+      return { success: true, data: response };
+    } catch (error) {
+      console.error(`Code execution error (${endpoint}):`, error);
+      return { success: false, error: error.message };
+    }
+  }
 
   async login(options) {
     try {
@@ -70,7 +88,6 @@ class PreloadBridge {
       };
     }
   }
-
 
   async fetchApi({ endpoint, data = {}, method = 'POST', headers = {} } = {}) {
     const defaultHeaders = {
@@ -106,10 +123,16 @@ class PreloadBridge {
 
   exposeApi() {
     contextBridge.exposeInMainWorld('api', {
+      // Existing methods...
       signup: (options) => this.fetchApi({ ...options }),
       login: (options) => this.login(options),
       getProfile: () => this.fetchApi({ endpoint: '/auth/profile', method: 'GET' }),
       
+      // Add code execution methods
+      executeJavaScript: (data) => this.executeCode('javascript', data),
+      executePython: (data) => this.executeCode('python', data),
+      executeJava: (data) => this.executeCode('java', data),
+
       // Class related endpoints
       createClass: (options) => this.fetchApi({
         endpoint: '/classes',
@@ -136,6 +159,47 @@ class PreloadBridge {
         method: 'POST',
         data: { studentId }
       }),
+      // Student-specific endpoints
+      getExams: () => this.fetchApi({
+        endpoint: '/exams',
+        method: 'GET',
+        headers: this.getAuthHeader()
+      }),
+      
+      getExamStats: () => this.fetchApi({
+          endpoint: '/exams/stats',
+          method: 'GET',
+          headers: this.getAuthHeader()
+      }),
+
+      startExam: (examId) => this.fetchApi({
+          endpoint: `/exams/${examId}/start`,
+          method: 'POST',
+          headers: this.getAuthHeader()
+      }),
+
+      submitExam: (examId, answers) => this.fetchApi({
+        endpoint: `/submissions/exams/${examId}/submit`,
+        method: 'POST',
+        data: { answers },
+        headers: {
+            'Content-Type': 'application/json',
+            ...this.getAuthHeader()
+        }
+      }),
+
+      getSubmissions: () => this.fetchApi({
+          endpoint: '/submissions',
+          method: 'GET',
+          headers: this.getAuthHeader()
+      }),
+     
+      getExamById: (examId) => this.fetchApi({
+        endpoint: `/exams/${examId}`,
+        method: 'GET',
+        headers: this.getAuthHeader()
+      }),
+      
 
       // Exam related endpoints
       createExam: async (examData) => {
@@ -224,6 +288,19 @@ class PreloadBridge {
       removeStudentFromClass: (classId, studentId) => this.fetchApi({
           endpoint: `/classes/${classId}/students/${studentId}`,
           method: 'DELETE',
+          headers: this.getAuthHeader()
+      }),
+
+
+      getStudentStats: () => this.fetchApi({
+          endpoint: '/exams/stats/student',
+          method: 'GET',
+          headers: this.getAuthHeader()
+      }),
+      
+      getAvailableExams: () => this.fetchApi({
+          endpoint: '/exams/available',
+          method: 'GET',
           headers: this.getAuthHeader()
       })
   });

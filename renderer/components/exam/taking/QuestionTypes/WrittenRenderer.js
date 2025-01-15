@@ -1,13 +1,18 @@
 import BaseQuestionRenderer from './BaseQuestionRenderer.js';
 
 export default class WrittenRenderer extends BaseQuestionRenderer {
+  constructor(question, options = {}) {
+    super(question, options);
+    this.answer = options.initialAnswer?.answer || '';
+  }
+
   validate() {
-    if (!this.answer?.trim()) {
+    if (!this.answer || typeof this.answer !== 'string') {
       return false;
     }
 
     if (this.question.maxWords) {
-      const wordCount = this.answer.trim().split(/\s+/).length;
+      const wordCount = this.getWordCount();
       return wordCount <= this.question.maxWords;
     }
 
@@ -17,13 +22,18 @@ export default class WrittenRenderer extends BaseQuestionRenderer {
   getValue() {
     return {
       questionType: 'Written',
+      questionId: this.question._id,
       answer: this.answer
     };
   }
 
+  getWordCount() {
+    return this.answer ? this.answer.trim().split(/\s+/).filter(word => word.length > 0).length : 0;
+  }
+
   updateWordCount() {
     if (this.wordCountElement && this.question.maxWords) {
-      const wordCount = this.answer ? this.answer.trim().split(/\s+/).length : 0;
+      const wordCount = this.getWordCount();
       this.wordCountElement.textContent = `${wordCount}/${this.question.maxWords} words`;
       this.wordCountElement.className = 
         wordCount > this.question.maxWords ? 'word-count exceeded' : 'word-count';
@@ -43,22 +53,32 @@ export default class WrittenRenderer extends BaseQuestionRenderer {
     textarea.placeholder = 'Enter your answer here...';
     textarea.rows = 6;
 
-    textarea.addEventListener('input', () => {
-      this.answer = textarea.value;
-      this.updateWordCount();
-      this.setState(this.getValue());
+    // Use a debounced update for better performance
+    let updateTimeout;
+    textarea.addEventListener('input', (e) => {
+        e.stopPropagation();
+        this.answer = e.target.value;
+        
+        if (updateTimeout) {
+            clearTimeout(updateTimeout);
+        }
+        
+        updateTimeout = setTimeout(() => {
+            this.updateWordCount();
+            this.setState(this.getValue());
+        }, 100);
     });
 
     if (this.question.maxWords) {
-      this.wordCountElement = document.createElement('div');
-      this.wordCountElement.className = 'word-count';
-      answerContainer.appendChild(this.wordCountElement);
-      this.updateWordCount();
+        this.wordCountElement = document.createElement('div');
+        this.wordCountElement.className = 'word-count';
+        answerContainer.appendChild(this.wordCountElement);
+        this.updateWordCount();
     }
 
     answerContainer.appendChild(textarea);
     container.appendChild(answerContainer);
 
     return container;
-  }
+}
 }
