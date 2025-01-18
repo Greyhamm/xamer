@@ -90,6 +90,7 @@ class ExamController {
                         type: q.type,
                         prompt: q.prompt,
                         media: q.media,
+                        points: q.points, // Add points
                         ...(q.type === 'MultipleChoice' && {
                             options: q.options,
                             correctOption: q.correctOption
@@ -109,7 +110,6 @@ class ExamController {
                     return createdQuestion;
                 })
             );
-    
             examData.questions = questionDocs.map(q => q._id);
     
             // Create exam

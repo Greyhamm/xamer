@@ -66,7 +66,8 @@ class SubmissionController {
 
     const submission = await ExamSubmission.findById(id)
         .populate('exam')
-        .populate('student', 'username email');
+        .populate('student', 'username email')
+        .populate('exam.questions'); // Make sure questions are populated
 
     if (!submission) {
         throw new ErrorResponse('Submission not found', 404);
@@ -80,8 +81,14 @@ class SubmissionController {
     // Update scores and feedback
     submission.answers = submission.answers.map(answer => {
         const grade = grades.find(g => g.questionId === answer.question.toString());
-        if (grade) {
-            answer.score = grade.score;
+        const question = submission.exam.questions.find(q => 
+            q._id.toString() === answer.question.toString()
+        );
+        
+        if (grade && question) {
+            // Ensure score doesn't exceed question points
+            const score = Math.min(grade.score, question.points);
+            answer.score = score;
             answer.feedback = grade.feedback;
         }
         return answer;

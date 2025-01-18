@@ -7,6 +7,7 @@ class BaseQuestion {
     this.state = {
       prompt: options.prompt || '',
       media: options.media || null,
+      points: options.points || 0,
       error: null
     };
     this.onDelete = options.onDelete;
@@ -15,60 +16,36 @@ class BaseQuestion {
   }
 
   setState(newState) {
-    const updatedState = { 
-      ...this.state, 
-      ...Object.keys(newState).reduce((acc, key) => {
-        acc[key] = newState[key];
-        return acc;
-      }, {}) 
-    };
-
-    this.state = updatedState;
-    
-    if (this.promptInput && this.promptInput.getValue() !== this.state.prompt) {
-      this.promptInput.setValue(this.state.prompt);
-    }
-  }
+    this.state = { ...this.state, ...newState };
+  } 
 
   createQuestionContainer() {
-    const container = document.createElement('div');
-    container.className = 'question-container';
-
-    // Question header
-    const header = document.createElement('div');
-    header.className = 'question-header';
+    const container = super.createQuestionContainer();
+  
+    // Add points input after prompt
+    const pointsGroup = document.createElement('div');
+    pointsGroup.className = 'form-group';
     
-    const typeLabel = document.createElement('span');
-    typeLabel.className = 'question-type';
-    typeLabel.textContent = this.type;
-
-    const deleteButton = document.createElement('button');
-    deleteButton.className = 'btn btn-danger btn-sm';
-    deleteButton.textContent = 'Delete';
-    deleteButton.onclick = () => this.onDelete?.();
-
-    header.appendChild(typeLabel);
-    header.appendChild(deleteButton);
-    container.appendChild(header);
-
-    // Prompt input
-    this.promptInput = new Input({
-      placeholder: 'Enter question prompt...',
-      value: this.state.prompt,
-      onChange: (value) => {
-        if (value !== this.state.prompt) {
-          this.setState({ prompt: value });
-        }
-      }
+    const pointsLabel = document.createElement('label');
+    pointsLabel.textContent = 'Points';
+    
+    const pointsInput = document.createElement('input');
+    pointsInput.type = 'number';
+    pointsInput.min = '0';
+    pointsInput.className = 'form-control points-input';
+    pointsInput.value = this.state.points;
+    pointsInput.addEventListener('input', (e) => {
+      this.setState({ points: parseInt(e.target.value) || 0 });
     });
-    container.appendChild(this.promptInput.render());
-
-    // Media upload
-    const mediaContainer = this.createMediaUpload();
-    container.appendChild(mediaContainer);
-
+  
+    pointsGroup.appendChild(pointsLabel);
+    pointsGroup.appendChild(pointsInput);
+    container.appendChild(pointsGroup);
+  
     return container;
   }
+  
+ 
 
   createMediaUpload() {
     const container = document.createElement('div');
@@ -169,13 +146,71 @@ class BaseQuestion {
 
   getQuestionData() {
     return {
+      type: this.type,
       prompt: this.state.prompt,
-      media: this.state.media
+      media: this.state.media,
+      points: this.state.points // Add this line
     };
   }
 
   render() {
-    return this.createQuestionContainer();
+    const container = document.createElement('div');
+    container.className = 'question-container';
+
+    // Question header
+    const header = document.createElement('div');
+    header.className = 'question-header';
+    
+    const typeLabel = document.createElement('span');
+    typeLabel.className = 'question-type';
+    typeLabel.textContent = this.type;
+
+    const deleteButton = document.createElement('button');
+    deleteButton.className = 'btn btn-danger btn-sm';
+    deleteButton.textContent = 'Delete';
+    deleteButton.onclick = () => this.onDelete?.();
+
+    header.appendChild(typeLabel);
+    header.appendChild(deleteButton);
+    container.appendChild(header);
+
+    // Prompt input
+    this.promptInput = new Input({
+      placeholder: 'Enter question prompt...',
+      value: this.state.prompt,
+      onChange: (value) => {
+        if (value !== this.state.prompt) {
+          this.setState({ prompt: value });
+        }
+      }
+    });
+    container.appendChild(this.promptInput.render());
+
+    // Points input
+    const pointsGroup = document.createElement('div');
+    pointsGroup.className = 'form-group';
+    
+    const pointsLabel = document.createElement('label');
+    pointsLabel.textContent = 'Points';
+    
+    const pointsInput = document.createElement('input');
+    pointsInput.type = 'number';
+    pointsInput.min = '0';
+    pointsInput.className = 'form-control points-input';
+    pointsInput.value = this.state.points;
+    pointsInput.addEventListener('input', (e) => {
+      this.setState({ points: parseInt(e.target.value) || 0 });
+    });
+
+    pointsGroup.appendChild(pointsLabel);
+    pointsGroup.appendChild(pointsInput);
+    container.appendChild(pointsGroup);
+
+    // Media upload
+    const mediaContainer = this.createMediaUpload();
+    container.appendChild(mediaContainer);
+
+    return container;
   }
 
   // Add base dispose method

@@ -20,34 +20,41 @@ class ValidationService {
       return errors;
     }
   
+
     static validateQuestion(question) {
       const errors = [];
-    
+
       if (!question.prompt?.trim()) {
         errors.push('Question prompt is required');
       }
-    
+
+      if (typeof question.points !== 'number' || question.points < 0) {
+        errors.push('Points must be a non-negative number');
+      }
+
       switch (question.type) {
         case 'MultipleChoice':
-          if (!question.options || question.options.length < 2) {
-            errors.push('Multiple choice question must have at least 2 options');
+          if (!Array.isArray(question.options) || question.options.length < 2) {
+            errors.push('Multiple choice questions must have at least 2 options');
           }
-          if (question.correctOption === undefined || 
-              question.correctOption < 0 || 
-              question.correctOption >= question.options.length) {
-            errors.push('Invalid correct option');
+          if (question.correctOption === undefined) {
+            errors.push('Correct option must be specified');
           }
           break;
+
         case 'Coding':
           if (!question.language) {
-            errors.push('Coding question must specify a language');
+            errors.push('Programming language must be specified');
           }
           break;
+
         case 'Written':
-          // Add any specific written question validations if needed
+          if (question.maxWords && question.maxWords < 1) {
+            errors.push('Maximum word count must be positive');
+          }
           break;
       }
-    
+
       return errors;
     }
   }

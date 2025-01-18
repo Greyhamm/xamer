@@ -56,8 +56,18 @@ const ExamSubmissionSchema = new mongoose.Schema({
 ExamSubmissionSchema.pre('save', function(next) {
   if (this.isModified('answers')) {
     const gradedAnswers = this.answers.filter(answer => answer.score !== null);
+    
     if (gradedAnswers.length === this.answers.length) {
-      this.totalScore = gradedAnswers.reduce((total, answer) => total + answer.score, 0);
+      // Calculate percentage based on points earned vs total points
+      const totalPoints = this.answers.reduce((total, answer) => {
+        return total + answer.question.points;
+      }, 0);
+      
+      const earnedPoints = gradedAnswers.reduce((total, answer) => {
+        return total + answer.score;
+      }, 0);
+
+      this.totalScore = Math.round((earnedPoints / totalPoints) * 100);
       this.status = 'graded';
       this.gradedAt = Date.now();
     }

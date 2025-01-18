@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 
+// backend/models/Exam.js
+
 const ExamSchema = new mongoose.Schema({
     title: { 
         type: String, 
@@ -26,10 +28,6 @@ const ExamSchema = new mongoose.Schema({
         enum: ['draft', 'published'],
         default: 'draft'
     },
-    totalPoints: {
-        type: Number,
-        default: 0
-    },
     timeLimit: {
         type: Number,
         default: null
@@ -40,24 +38,31 @@ const ExamSchema = new mongoose.Schema({
     toObject: { virtuals: true }
 });
 
-// Ensure questions are always selected
-ExamSchema.pre(/^find/, function(next) {
-    if (!this._fields || !this._fields.questions) {
-        this.select('+questions');
+// Calculate total points as a method instead of a virtual
+ExamSchema.methods.calculateTotalPoints = function() {
+    if (!this.questions || !Array.isArray(this.questions)) return 0;
+    return this.questions.reduce((total, question) => total + (question.points || 0), 0);
+};
+
+// Add a pre-save middleware to calculate and store total points
+ExamSchema.pre('save', async function(next) {
+    if (this.questions && Array.isArray(this.questions)) {
+        // Ensure questions are populated
+        if (!this.populated('questions')) {
+            await this.populate('questions');
+        }
+        const totalPoints = this.calculateTotalPoints();
+        this.set('totalPoints', totalPoints);
     }
     next();
 });
 
-module.exports = mongoose.model('Exam', ExamSchema);
-// Add a pre-save middleware to log class information
-ExamSchema.pre('save', function(next) {
-  console.log('Exam pre-save middleware running with data:', {
-    examId: this._id,
-    title: this.title,
-    classId: this.class,
-    status: this.status
-  });
-  next();
+// Add pre-find middleware to ensure questions are populated
+ExamSchema.pre(/^find/, function(next) {
+    if (!this._fields || !this._fields.questions) {
+        this.populate('questions');
+    }
+    next();
 });
 
 module.exports = mongoose.model('Exam', ExamSchema);

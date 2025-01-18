@@ -14,20 +14,20 @@ export default class WrittenQuestion extends BaseQuestion {
 
   getQuestionData() {
     return {
-      type: this.type, // Ensure type is set
-      prompt: this.state.prompt,
+      ...super.getQuestionData(), // Include base question data with points
+      type: this.type,
       maxWords: this.state.maxWords,
       rubric: this.state.rubric
     };
   }
 
   render() {
-    const container = super.createQuestionContainer();
-
+    const container = super.render();
+    container.className += ' written-question';
+  
     // Max words input
     const maxWordsGroup = document.createElement('div');
     maxWordsGroup.className = 'form-group';
-    
     const maxWordsLabel = document.createElement('label');
     maxWordsLabel.textContent = 'Maximum Words (optional)';
     

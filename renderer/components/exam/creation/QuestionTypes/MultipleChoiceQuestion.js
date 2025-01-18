@@ -16,9 +16,8 @@ export default class MultipleChoiceQuestion extends BaseQuestion {
 
   getQuestionData() {
     return {
+      ...super.getQuestionData(), // Include base question data with points
       type: this.type,
-      prompt: this.state.prompt,
-      media: this.state.media,
       options: this.state.options,
       correctOption: this.state.correctOption
     };
@@ -41,12 +40,13 @@ export default class MultipleChoiceQuestion extends BaseQuestion {
   }
 
   render() {
-    const container = super.createQuestionContainer();
-
+    const container = super.render();
+    container.className += ' multiple-choice-question';
+  
     // Options container
     const optionsContainer = document.createElement('div');
     optionsContainer.className = 'options-container';
-
+  
     // Render options
     this.state.options.forEach((option, index) => {
       const optionGroup = document.createElement('div');

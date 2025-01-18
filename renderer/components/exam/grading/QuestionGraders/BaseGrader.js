@@ -31,15 +31,17 @@ export default class BaseGrader {
       // Score input
       const scoreContainer = document.createElement('div');
       scoreContainer.className = 'score-input-container';
+      
+      const maxPoints = this.question.points;
       scoreContainer.innerHTML = `
-          <label>Score (0-100):</label>
-          <input type="number" min="0" max="100" class="score-input" value="${this.state.score || ''}">
+        <label>Score (0-${maxPoints} points):</label>
+        <input type="number" min="0" max="${maxPoints}" class="score-input" value="${this.state.score || ''}">
       `;
-
+    
       const scoreInput = scoreContainer.querySelector('input');
       scoreInput.addEventListener('input', (e) => {
-          const score = parseInt(e.target.value) || null;
-          this.setState({ score });
+        const score = Math.min(parseInt(e.target.value) || 0, maxPoints);
+        this.setState({ score });
       });
 
       // Feedback input

@@ -9,7 +9,8 @@ const MediaSchema = new mongoose.Schema({
 const QuestionSchema = new mongoose.Schema({
   prompt: { type: String, required: true },
   type: { type: String, required: true, enum: ['MultipleChoice', 'Written', 'Coding'] },
-  media: { type: MediaSchema, default: null }, // Add this line
+  media: { type: MediaSchema, default: null },
+  points: { type: Number, required: true, default: 0 } // Add this line
 });
 
 module.exports = QuestionSchema;

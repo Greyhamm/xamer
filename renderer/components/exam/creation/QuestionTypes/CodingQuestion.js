@@ -18,17 +18,17 @@ export default class CodingQuestion extends BaseQuestion {
 
   getQuestionData() {
     return {
+      ...super.getQuestionData(), // Include base question data with points
       type: this.type,
-      prompt: this.state.prompt,
       language: this.state.language,
       initialCode: this.editor ? this.editor.getValue() : this.state.initialCode,
-      media: this.state.media
     };
   }
 
   render() {
-    const container = super.createQuestionContainer();
-
+    const container = super.render();
+    container.className += ' coding-question';
+  
     // Language selection
     const languageSelect = document.createElement('select');
     languageSelect.className = 'form-control';

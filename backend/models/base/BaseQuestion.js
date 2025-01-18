@@ -14,6 +14,7 @@ const BaseQuestionSchema = new mongoose.Schema({
     enum: ['MultipleChoice', 'Written', 'Coding'] 
   },
   media: { type: MediaSchema, default: null },
+  points: { type: Number, required: true, min: 0 }, // Add points field
 }, {
   discriminatorKey: 'type',
   timestamps: true,

@@ -20,6 +20,12 @@ export default class BaseQuestionRenderer {
     const promptContainer = document.createElement('div');
     promptContainer.className = 'question-prompt';
   
+    // Add points display
+    const pointsDisplay = document.createElement('div');
+    pointsDisplay.className = 'question-points';
+    pointsDisplay.textContent = `Points: ${this.question.points}`;
+    promptContainer.appendChild(pointsDisplay);
+
     const promptText = document.createElement('p');
     promptText.textContent = this.question.prompt;
     promptContainer.appendChild(promptText);
