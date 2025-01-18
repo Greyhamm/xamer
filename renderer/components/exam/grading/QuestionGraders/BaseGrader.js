@@ -5,16 +5,23 @@ export default class BaseGrader {
       this.answer = options.answer;
       this.onGradeChange = options.onGradeChange;
       this.state = {
-          score: null,
-          feedback: ''
+          score: this.answer.score || null,
+          feedback: this.answer.feedback || ''
       };
   }
 
   setState(newState) {
       this.state = { ...this.state, ...newState };
       if (this.onGradeChange) {
-          this.onGradeChange(this.state);
+          // Only send score and feedback to parent
+          const { score, feedback } = this.state;
+          this.onGradeChange({ score, feedback });
       }
+      this.updateUI();
+  }
+
+  updateUI() {
+      // To be implemented by specific graders
   }
 
   createGradingControls() {
@@ -31,7 +38,8 @@ export default class BaseGrader {
 
       const scoreInput = scoreContainer.querySelector('input');
       scoreInput.addEventListener('input', (e) => {
-          this.setState({ score: parseInt(e.target.value) || 0 });
+          const score = parseInt(e.target.value) || null;
+          this.setState({ score });
       });
 
       // Feedback input
@@ -59,7 +67,6 @@ export default class BaseGrader {
       // Question display
       const questionDisplay = document.createElement('div');
       questionDisplay.className = 'question-display';
-      questionDisplay.innerHTML = `<div class="question-prompt">${this.question.prompt}</div>`;
       container.appendChild(questionDisplay);
 
       // Answer display - to be implemented by specific graders
@@ -74,5 +81,10 @@ export default class BaseGrader {
   renderAnswer() {
       // To be implemented by specific graders
       return document.createElement('div');
+  }
+
+  dispose() {
+      // Clean up any resources
+      this.onGradeChange = null;
   }
 }

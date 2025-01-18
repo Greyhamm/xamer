@@ -1,115 +1,165 @@
 // renderer/components/exam/grading/GradingView.js
-import Button from '../../common/Button.js';
-import AppState from '../../../services/state/AppState.js';
 import { MultipleChoiceGrader, WrittenGrader, CodingGrader } from './QuestionGraders/index.js';
 
-// In GradingView.js
 export default class GradingView {
-  constructor(options) {
-    console.log('GradingView constructor called with options:', options);
-    
-    if (!options?.submissionId) {
-      console.error('No submission ID provided to GradingView');
-      this.state = {
-        error: 'Invalid submission ID',
-        loading: false
-      };
-      return;
+    constructor(options) {
+        this.submissionId = options?.submissionId;
+        this.state = {
+            submission: null,
+            grades: new Map(),
+            loading: true,
+            error: null
+        };
+
+        this.graders = {
+            MultipleChoice: MultipleChoiceGrader,
+            Written: WrittenGrader,
+            Coding: CodingGrader
+        };
+
+        this.graderInstances = new Map();
+        this.container = null;
     }
-
-    this.state = {
-      submissionId: options.submissionId,
-      submission: null,
-      grades: new Map(),
-      loading: true,
-      error: null
-    };
-
-    // Initialize graders
-    this.graders = {
-      MultipleChoice: MultipleChoiceGrader,
-      Written: WrittenGrader,
-      Coding: CodingGrader
-    };
-
-    // Load the submission data
-    this.loadSubmission();
-  }
-
-  async loadSubmission() {
-    try {
-      console.log('Loading submission:', this.state.submissionId);
-      
-      if (!this.state.submissionId) {
-        throw new Error('No submission ID provided');
-      }
-
-      const response = await window.api.getSubmissionById(this.state.submissionId);
-      console.log('Submission response:', response);
-      
-      if (!response || !response.success) {
-        throw new Error(response?.error || 'Failed to load submission');
-      }
-
-      const submission = response.data;
-      if (!submission.exam || !submission.student) {
-        throw new Error('Incomplete submission data');
-      }
-
-      this.setState({
-        submission,
-        loading: false,
-        error: null
-      });
-    } catch (error) {
-      console.error('Load submission error:', error);
-      this.setState({
-        error: error.message || 'Failed to load submission',
-        loading: false
-      });
-    }
-  }
 
     setState(newState) {
+        const prevState = this.state;
         this.state = { ...this.state, ...newState };
-        if (this.container) {
-            this.updateUI();
+        
+        // Only update UI if needed
+        if (JSON.stringify(prevState) !== JSON.stringify(this.state)) {
+            requestAnimationFrame(() => this.updateUI());
         }
     }
 
-    updateUI() {
-        const container = this.render();
-        this.container.replaceWith(container);
-        this.container = container;
+    async loadSubmission() {
+        try {
+            const response = await window.api.getSubmissionById(this.submissionId);
+            
+            if (!response.success) {
+                throw new Error(response.error || 'Failed to load submission');
+            }
+
+            const submission = response.data;
+            
+            // Match answers with questions
+            submission.answers = submission.answers.map(answer => {
+                const matchingQuestion = submission.exam.questions.find(q => 
+                    q._id === answer.question || q._id === answer.questionId
+                );
+                return {
+                    ...answer,
+                    questionData: matchingQuestion // Store full question data
+                };
+            });
+
+            this.setState({
+                submission,
+                loading: false,
+                error: null
+            });
+        } catch (error) {
+            console.error('Load submission error:', error);
+            this.setState({
+                error: error.message || 'Failed to load submission',
+                loading: false
+            });
+        }
     }
 
     handleGradeChange(questionId, gradeData) {
-        const grades = new Map(this.state.grades);
-        grades.set(questionId, gradeData);
-        this.setState({ grades });
+        const newGrades = new Map(this.state.grades);
+        newGrades.set(questionId, gradeData);
+        this.setState({ grades: newGrades });
+    }
+
+    createGrader(answer, index) {
+        const question = answer.questionData;
+        if (!question) return null;
+
+        const graderId = `grader-${question._id}`;
+        if (this.graderInstances.has(graderId)) {
+            return this.graderInstances.get(graderId);
+        }
+
+        const GraderComponent = this.graders[question.type];
+        if (!GraderComponent) return null;
+
+        const grader = new GraderComponent({
+            question,
+            answer: {
+                ...answer,
+                question: question // Ensure question data is available
+            },
+            onGradeChange: (gradeData) => {
+                this.handleGradeChange(question._id, gradeData);
+            }
+        });
+
+        this.graderInstances.set(graderId, grader);
+        return grader;
+    }
+
+    renderQuestions() {
+        if (!this.state.submission?.answers) return null;
+
+        const container = document.createElement('div');
+        container.className = 'questions-container';
+
+        this.state.submission.answers.forEach((answer, index) => {
+            const questionSection = document.createElement('div');
+            questionSection.className = 'question-grading-section';
+
+            const header = document.createElement('h3');
+            header.textContent = `Question ${index + 1}`;
+            questionSection.appendChild(header);
+
+            // Display question prompt
+            if (answer.questionData?.prompt) {
+                const prompt = document.createElement('div');
+                prompt.className = 'question-prompt';
+                prompt.textContent = answer.questionData.prompt;
+                questionSection.appendChild(prompt);
+
+                // Display student's answer
+                const answerDisplay = document.createElement('div');
+                answerDisplay.className = 'student-answer';
+                answerDisplay.innerHTML = `<strong>Student's Answer:</strong> ${answer.answer}`;
+                questionSection.appendChild(answerDisplay);
+
+                // Create and render appropriate grader
+                const grader = this.createGrader(answer, index);
+                if (grader) {
+                    questionSection.appendChild(grader.render());
+                }
+            }
+
+            container.appendChild(questionSection);
+        });
+
+        return container;
     }
 
     async submitGrades() {
         try {
             this.setState({ loading: true });
 
-            const gradesToSubmit = Array.from(this.state.grades.entries()).map(([questionId, grade]) => ({
-                questionId,
-                score: grade.score,
-                feedback: grade.feedback
-            }));
+            const gradesToSubmit = Array.from(this.state.grades.entries())
+                .map(([questionId, grade]) => ({
+                    questionId,
+                    ...grade
+                }));
 
-            const response = await window.api.gradeSubmission(this.state.submissionId, gradesToSubmit);
+            const response = await window.api.gradeSubmission(
+                this.submissionId,
+                gradesToSubmit
+            );
 
             if (!response.success) {
                 throw new Error(response.error || 'Failed to submit grades');
             }
 
             alert('Grades submitted successfully!');
-            AppState.navigateTo('submissionsList', {
-                examId: this.state.submission.exam._id,
-                classId: this.state.submission.exam.class
-            });
+            window.location.hash = '#/submissions';
         } catch (error) {
             console.error('Submit grades error:', error);
             this.setState({
@@ -119,32 +169,36 @@ export default class GradingView {
         }
     }
 
-    render() {
-        this.container = document.createElement('div');
-        this.container.className = 'grading-view';
-
+    updateUI() {
+        if (!this.container) return;
+        
+        this.container.innerHTML = '';
+        
         if (this.state.loading) {
-            this.container.innerHTML = '<div class="loading">Loading submission...</div>';
-            return this.container;
+            const loading = document.createElement('div');
+            loading.className = 'loading';
+            loading.textContent = 'Loading submission...';
+            this.container.appendChild(loading);
+            return;
         }
 
         if (this.state.error) {
-            this.container.innerHTML = `
-                <div class="error-message">${this.state.error}</div>
-                <button class="btn btn-secondary back-btn">Back to Submissions</button>
-            `;
-            this.container.querySelector('.back-btn').addEventListener('click', () => {
-                AppState.navigateTo('submissionsList');
-            });
-            return this.container;
+            const error = document.createElement('div');
+            error.className = 'error-message';
+            error.textContent = this.state.error;
+            this.container.appendChild(error);
+            return;
         }
 
         if (!this.state.submission) {
-            this.container.innerHTML = '<div class="error-message">No submission data available</div>';
-            return this.container;
+            const noData = document.createElement('div');
+            noData.className = 'error-message';
+            noData.textContent = 'No submission data available';
+            this.container.appendChild(noData);
+            return;
         }
 
-        // Header section
+        // Header
         const header = document.createElement('div');
         header.className = 'grading-header';
         header.innerHTML = `
@@ -156,41 +210,39 @@ export default class GradingView {
         `;
         this.container.appendChild(header);
 
-        // Questions and answers
-        const questionsContainer = document.createElement('div');
-        questionsContainer.className = 'questions-container';
-
-        this.state.submission.answers.forEach((answer, index) => {
-            const questionContainer = document.createElement('div');
-            questionContainer.className = 'question-grading-section';
-
-            const questionHeader = document.createElement('h3');
-            questionHeader.textContent = `Question ${index + 1}`;
-            questionContainer.appendChild(questionHeader);
-
-            const GraderComponent = this.graders[answer.question.type];
-            if (GraderComponent) {
-                const grader = new GraderComponent({
-                    question: answer.question,
-                    answer: answer,
-                    onGradeChange: (gradeData) => this.handleGradeChange(answer.question._id, gradeData)
-                });
-                questionContainer.appendChild(grader.render());
-            }
-
-            questionsContainer.appendChild(questionContainer);
-        });
-
-        this.container.appendChild(questionsContainer);
+        // Questions
+        const questionsContainer = this.renderQuestions();
+        if (questionsContainer) {
+            this.container.appendChild(questionsContainer);
+        }
 
         // Submit button
-        const submitButton = new Button({
-            text: 'Submit Grades',
-            className: 'btn-primary submit-grades-btn',
-            onClick: () => this.submitGrades()
-        });
-        this.container.appendChild(submitButton.render());
+        const submitButton = document.createElement('button');
+        submitButton.className = 'btn btn-primary submit-grades-btn';
+        submitButton.textContent = 'Submit Grades';
+        submitButton.addEventListener('click', () => this.submitGrades());
+        this.container.appendChild(submitButton);
+    }
 
+    render() {
+        this.container = document.createElement('div');
+        this.container.className = 'grading-view';
+
+        // Initial load
+        if (!this.state.submission && !this.state.error) {
+            this.loadSubmission();
+        }
+
+        this.updateUI();
         return this.container;
+    }
+
+    dispose() {
+        this.graderInstances.forEach(grader => {
+            if (grader.dispose) {
+                grader.dispose();
+            }
+        });
+        this.graderInstances.clear();
     }
 }
