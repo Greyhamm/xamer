@@ -57,26 +57,34 @@ class SubmissionController {
   // @route   POST /api/submissions/:id/grade
   // @access  Private/Teacher
   gradeSubmission = asyncHandler(async (req, res) => {
-    const submission = await ExamSubmission.findById(req.params.id)
-      .populate('exam');
+    const { id } = req.params;
+    const { grades } = req.body;
+
+    if (!Array.isArray(grades)) {
+        throw new ErrorResponse('Invalid grades format', 400);
+    }
+
+    const submission = await ExamSubmission.findById(id)
+        .populate('exam')
+        .populate('student', 'username email');
 
     if (!submission) {
-      throw new ErrorResponse('Submission not found', 404);
+        throw new ErrorResponse('Submission not found', 404);
     }
 
     // Verify teacher owns the exam
     if (submission.exam.creator.toString() !== req.user.userId) {
-      throw new ErrorResponse('Not authorized to grade this submission', 403);
+        throw new ErrorResponse('Not authorized to grade this submission', 403);
     }
 
     // Update scores and feedback
     submission.answers = submission.answers.map(answer => {
-      const grade = req.body.grades.find(g => g.questionId === answer.question.toString());
-      if (grade) {
-        answer.score = grade.score;
-        answer.feedback = grade.feedback;
-      }
-      return answer;
+        const grade = grades.find(g => g.questionId === answer.question.toString());
+        if (grade) {
+            answer.score = grade.score;
+            answer.feedback = grade.feedback;
+        }
+        return answer;
     });
 
     submission.status = 'graded';
@@ -85,9 +93,14 @@ class SubmissionController {
 
     await submission.save();
 
+    // Return populated submission
+    const gradedSubmission = await ExamSubmission.findById(id)
+        .populate('exam')
+        .populate('student', 'username email');
+
     res.status(200).json({
-      success: true,
-      data: submission
+        success: true,
+        data: gradedSubmission
     });
   });
 

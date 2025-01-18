@@ -140,35 +140,59 @@ export default class GradingView {
     }
 
     async submitGrades() {
-        try {
-            this.setState({ loading: true });
+      try {
+          this.setState({ loading: true, error: null });
 
-            const gradesToSubmit = Array.from(this.state.grades.entries())
-                .map(([questionId, grade]) => ({
-                    questionId,
-                    ...grade
-                }));
+          // Get all grade inputs
+          const grades = [];
+          this.state.submission?.answers?.forEach((answer) => {
+              const grade = this.state.grades.get(answer.question);
+              if (!grade) {
+                  throw new Error('Please grade all questions before submitting');
+              }
+              grades.push({
+                  questionId: answer.question,
+                  score: grade.score,
+                  feedback: grade.feedback
+              });
+          });
 
-            const response = await window.api.gradeSubmission(
-                this.submissionId,
-                gradesToSubmit
-            );
+          if (grades.length === 0) {
+              throw new Error('No grades to submit');
+          }
 
-            if (!response.success) {
-                throw new Error(response.error || 'Failed to submit grades');
-            }
+          const response = await window.api.gradeSubmission(
+              this.state.submission._id,
+              { grades }
+          );
 
-            alert('Grades submitted successfully!');
-            window.location.hash = '#/submissions';
-        } catch (error) {
-            console.error('Submit grades error:', error);
-            this.setState({
-                error: error.message,
-                loading: false
-            });
-        }
+          if (!response.success) {
+              throw new Error(response.error || 'Failed to submit grades');
+          }
+
+          // Update local state with graded submission
+          this.setState({
+              submission: response.data,
+              loading: false,
+              error: null
+          });
+
+          alert('Grades submitted successfully!');
+          
+          // Navigate back or refresh the list
+          if (this.onGradingComplete) {
+              this.onGradingComplete();
+          }
+
+      } catch (error) {
+          console.error('Submit grades error:', error);
+          this.setState({ 
+              error: error.message || 'Failed to submit grades',
+              loading: false 
+          });
+      }
     }
-
+    
     updateUI() {
         if (!this.container) return;
         

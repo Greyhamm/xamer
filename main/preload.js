@@ -308,9 +308,19 @@ class PreloadBridge {
           endpoint: '/exams/available',
           method: 'GET',
           headers: this.getAuthHeader()
-      })
+      }),
+
+      gradeSubmission: (submissionId, grades) => this.fetchApi({
+        endpoint: `/submissions/${submissionId}/grade`,
+        method: 'POST',
+        data: grades,
+        headers: {
+            'Content-Type': 'application/json',
+            ...this.getAuthHeader()
+        }
+    }),
   });
-  }
+}
 
   async uploadMedia(file) {
     try {
