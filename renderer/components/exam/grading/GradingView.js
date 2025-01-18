@@ -1,22 +1,23 @@
 // renderer/components/exam/grading/GradingView.js
 import { MultipleChoiceGrader, WrittenGrader, CodingGrader } from './QuestionGraders/index.js';
-
+import AppState from '../../../services/state/AppState.js';
 export default class GradingView {
     constructor(options) {
         this.submissionId = options?.submissionId;
+        this.examId = null; // Add this to store exam ID
         this.state = {
             submission: null,
             grades: new Map(),
             loading: true,
             error: null
         };
-
+    
         this.graders = {
             MultipleChoice: MultipleChoiceGrader,
             Written: WrittenGrader,
             Coding: CodingGrader
         };
-
+    
         this.graderInstances = new Map();
         this.container = null;
     }
@@ -38,8 +39,9 @@ export default class GradingView {
             if (!response.success) {
                 throw new Error(response.error || 'Failed to load submission');
             }
-
+    
             const submission = response.data;
+            this.examId = submission.exam._id; // Store the exam ID
             
             // Match answers with questions
             submission.answers = submission.answers.map(answer => {
@@ -48,10 +50,10 @@ export default class GradingView {
                 );
                 return {
                     ...answer,
-                    questionData: matchingQuestion // Store full question data
+                    questionData: matchingQuestion
                 };
             });
-
+    
             this.setState({
                 submission,
                 loading: false,
@@ -140,57 +142,42 @@ export default class GradingView {
     }
 
     async submitGrades() {
-      try {
-          this.setState({ loading: true, error: null });
-
-          // Get all grade inputs
-          const grades = [];
-          this.state.submission?.answers?.forEach((answer) => {
-              const grade = this.state.grades.get(answer.question);
-              if (!grade) {
-                  throw new Error('Please grade all questions before submitting');
-              }
-              grades.push({
-                  questionId: answer.question,
-                  score: grade.score,
-                  feedback: grade.feedback
-              });
-          });
-
-          if (grades.length === 0) {
-              throw new Error('No grades to submit');
-          }
-
-          const response = await window.api.gradeSubmission(
-              this.state.submission._id,
-              { grades }
-          );
-
-          if (!response.success) {
-              throw new Error(response.error || 'Failed to submit grades');
-          }
-
-          // Update local state with graded submission
-          this.setState({
-              submission: response.data,
-              loading: false,
-              error: null
-          });
-
-          alert('Grades submitted successfully!');
-          
-          // Navigate back or refresh the list
-          if (this.onGradingComplete) {
-              this.onGradingComplete();
-          }
-
-      } catch (error) {
-          console.error('Submit grades error:', error);
-          this.setState({ 
-              error: error.message || 'Failed to submit grades',
-              loading: false 
-          });
-      }
+        try {
+            this.setState({ loading: true, error: null });
+    
+            // Validate all questions have grades
+            for (const answer of this.state.submission.answers) {
+                if (!this.state.grades.has(answer.question)) {
+                    throw new Error('Please grade all questions before submitting');
+                }
+            }
+    
+            const grades = Array.from(this.state.grades.entries()).map(([questionId, grade]) => ({
+                questionId,
+                ...grade
+            }));
+    
+            const response = await window.api.gradeSubmission(this.submissionId, { grades });
+    
+            if (!response.success) {
+                throw new Error(response.error || 'Failed to submit grades');
+            }
+    
+            alert('Grades submitted successfully!');
+            
+            // Navigate back to submissions list with exam ID
+            AppState.navigateTo('submissionsList', { 
+                examId: this.examId,
+                classId: this.state.submission.exam.class 
+            });
+    
+        } catch (error) {
+            console.error('Submit grades error:', error);
+            this.setState({ 
+                error: error.message || 'Failed to submit grades',
+                loading: false 
+            });
+        }
     }
     
     updateUI() {
