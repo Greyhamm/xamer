@@ -12,18 +12,22 @@ class SubmissionAPI {
       }
   }
 
-  static async getSubmissionById(submissionId) {
-      try {
-          const response = await window.api.getSubmissionById(submissionId);
-          if (!response.success) {
-              throw new Error(response.error || 'Failed to fetch submission');
-          }
-          return response.data;
-      } catch (error) {
-          console.error('Get submission by ID error:', error);
-          throw error;
-      }
-  }
+    static async getSubmissionById(submissionId) {
+        try {
+        if (!submissionId) {
+            throw new Error('Submission ID is required');
+        }
+    
+        const response = await window.api.getSubmissionById(submissionId);
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to fetch submission');
+        }
+        return response;
+        } catch (error) {
+        console.error('Get submission by ID error:', error);
+        throw error;
+        }
+    }
 
   static async gradeSubmission(submissionId, grades) {
       try {

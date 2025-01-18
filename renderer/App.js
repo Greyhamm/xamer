@@ -77,7 +77,14 @@ async renderView(view) {
             }
             break;
           case 'gradingView':
-            component = new GradingView(view.params.submissionId);
+            if (!view.params?.submissionId) {
+              console.error('No submission ID provided to GradingView');
+              // Maybe show an error message or redirect
+              return;
+            }
+            component = new GradingView({
+              submissionId: view.params.submissionId
+            });
             break;
           case 'submissionsList':
             component = new SubmissionsList(view.params);

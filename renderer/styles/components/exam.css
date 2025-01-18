@@ -73,32 +73,112 @@
   }
   
   /* Grading View Styles */
-  .grading-container {
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    padding: 2rem;
-  }
-  
-  .grading-section {
-    border-bottom: 1px solid var(--border-color);
-    padding: 1.5rem 0;
-  }
-  
-  .score-input {
-    width: 100px;
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-  }
-  
-  .feedback-input {
-    width: 100%;
-    min-height: 100px;
-    padding: 0.5rem;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-  }
+
+.grading-view {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.grading-header {
+  margin-bottom: 2rem;
+}
+
+.grading-header h2 {
+  margin-bottom: 0.5rem;
+}
+
+.submission-info {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.question-grading-section {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.question-display {
+  margin-bottom: 1.5rem;
+}
+
+.grading-controls {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 4px;
+  margin-top: 1rem;
+}
+
+.score-input-container {
+  margin-bottom: 1rem;
+}
+
+.score-input {
+  width: 100px;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.feedback-input {
+  width: 100%;
+  min-height: 100px;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  resize: vertical;
+}
+
+.option-display {
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.option-display.selected {
+  background-color: #e3f2fd;
+}
+
+.option-display.correct {
+  border-color: #4caf50;
+}
+
+.option-marker {
+  margin-right: 0.75rem;
+  color: #1976d2;
+}
+
+.correct-marker {
+  margin-left: auto;
+  color: #4caf50;
+}
+
+.execution-controls {
+  margin-top: 1rem;
+}
+
+.execution-output {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.execution-output .error {
+  color: #dc3545;
+}
+
+.submit-grades-btn {
+  margin-top: 2rem;
+  width: 100%;
+  padding: 1rem;
+}
   
   /* Status Badges */
   .status-badge {

@@ -1,131 +1,100 @@
+// renderer/components/exam/grading/QuestionGraders/CodingGrader.js
 import BaseGrader from './BaseGrader.js';
 import MonacoEditor from '../../../common/MonacoEditor.js';
 
 export default class CodingGrader extends BaseGrader {
-  constructor(options) {
-    super(options);
-    this.editor = null;
-    this.executionResult = null;
-  }
-
-  async executeCode() {
-    try {
-      this.executionButton.disabled = true;
-      this.executionButton.textContent = 'Executing...';
-      
-      const response = await window.api[`execute${this.question.language}`](this.answer.answer);
-      this.executionResult = response;
-      
-      this.updateExecutionDisplay(response);
-    } catch (error) {
-      this.updateExecutionDisplay({ error: error.message }, true);
-    } finally {
-      this.executionButton.disabled = false;
-      this.executionButton.textContent = 'Run Code';
-    }
-  }
-
-  updateExecutionDisplay(result, isError = false) {
-    if (!this.outputContainer) return;
-
-    this.outputContainer.className = `execution-output ${isError ? 'error' : ''}`;
-    
-    if (isError) {
-      this.outputContainer.textContent = `Error: ${result.error}`;
-      return;
+    constructor(options) {
+        super(options);
+        this.editor = null;
+        this.state = {
+            ...this.state,
+            executionResult: null,
+            isExecuting: false
+        };
     }
 
-    let output = '';
-    if (result.logs && result.logs.length > 0) {
-      output += result.logs.join('\n');
-    }
-    if (result.result) {
-      if (output) output += '\n';
-      output += result.result;
-    }
+    async executeCode() {
+        try {
+            this.setState({ isExecuting: true });
+            
+            const response = await window.api[`execute${this.question.language}`]({
+                code: this.answer.answer
+            });
 
-    this.outputContainer.textContent = output || 'No output';
-  }
-
-  renderAnswerDisplay() {
-    const container = document.createElement('div');
-    container.className = 'coding-answer';
-
-    // Code display
-    const editorContainer = document.createElement('div');
-    editorContainer.className = 'monaco-editor-container';
-
-    this.editor = new MonacoEditor({
-      language: this.question.language,
-      value: this.answer.answer,
-      readOnly: true
-    });
-
-    // Execution controls
-    const controlsContainer = document.createElement('div');
-    controlsContainer.className = 'execution-controls';
-
-    this.executionButton = document.createElement('button');
-    this.executionButton.className = 'btn btn-primary';
-    this.executionButton.textContent = 'Run Code';
-    this.executionButton.addEventListener('click', () => this.executeCode());
-
-    this.outputContainer = document.createElement('pre');
-    this.outputContainer.className = 'execution-output';
-
-    controlsContainer.appendChild(this.executionButton);
-    controlsContainer.appendChild(this.outputContainer);
-
-    // Test cases if available
-    if (this.question.testCases && this.question.testCases.length > 0) {
-      const testCasesContainer = this.renderTestCases();
-      container.appendChild(testCasesContainer);
+            this.setState({
+                executionResult: response.success ? response.data : { error: response.error },
+                isExecuting: false
+            });
+        } catch (error) {
+            this.setState({
+                executionResult: { error: error.message },
+                isExecuting: false
+            });
+        }
     }
 
-    container.appendChild(editorContainer);
-    container.appendChild(controlsContainer);
+    renderAnswer() {
+        const container = document.createElement('div');
+        container.className = 'coding-answer';
 
-    // Initialize editor after container is in DOM
-    setTimeout(() => {
-      this.editor.mount(editorContainer);
-    }, 0);
+        // Language info
+        const languageInfo = document.createElement('div');
+        languageInfo.className = 'language-info';
+        languageInfo.textContent = `Language: ${this.question.language}`;
+        container.appendChild(languageInfo);
 
-    return container;
-  }
+        // Code editor
+        const editorContainer = document.createElement('div');
+        editorContainer.className = 'monaco-editor-container';
+        editorContainer.style.height = '300px';
+        container.appendChild(editorContainer);
 
-  renderTestCases() {
-    const container = document.createElement('div');
-    container.className = 'test-cases-container';
-    
-    container.innerHTML = `<h4>Test Cases</h4>`;
+        // Execute controls
+        const controlsContainer = document.createElement('div');
+        controlsContainer.className = 'execution-controls';
 
-    const table = document.createElement('table');
-    table.className = 'test-cases-table';
-    table.innerHTML = `
-      <thead>
-        <tr>
-          <th>Input</th>
-          <th>Expected Output</th>
-          <th>Points</th>
-          <th>Result</th>
-        </tr>
-      </thead>
-    `;
+        const runButton = document.createElement('button');
+        runButton.className = 'btn btn-primary run-code-btn';
+        runButton.textContent = this.state.isExecuting ? 'Running...' : 'Run Code';
+        runButton.disabled = this.state.isExecuting;
+        runButton.addEventListener('click', () => this.executeCode());
+        controlsContainer.appendChild(runButton);
 
-    const tbody = document.createElement('tbody');
-    this.question.testCases.forEach(testCase => {
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td>${testCase.input}</td>
-        <td>${testCase.expectedOutput}</td>
-        <td>${testCase.points}</td>
-        <td class="test-result">Pending</td>
-      `;
-      tbody.appendChild(row);
-    });
+        // Output display
+        if (this.state.executionResult) {
+            const outputContainer = document.createElement('div');
+            outputContainer.className = 'execution-output';
+            
+            if (this.state.executionResult.error) {
+                outputContainer.innerHTML = `<pre class="error">${this.state.executionResult.error}</pre>`;
+            } else {
+                outputContainer.innerHTML = `<pre>${this.state.executionResult.result || 'No output'}</pre>`;
+            }
+            
+            controlsContainer.appendChild(outputContainer);
+        }
 
-    table.appendChild(tbody);
-    container.appendChild(table);
-    return container;
-  }
+        container.appendChild(controlsContainer);
+
+        // Initialize editor after container is in DOM
+        setTimeout(() => {
+            if (!this.editor) {
+                this.editor = new MonacoEditor({
+                    language: this.question.language.toLowerCase(),
+                    value: this.answer.answer,
+                    readOnly: true
+                });
+                this.editor.mount(editorContainer);
+            }
+        }, 0);
+
+        return container;
+    }
+
+    dispose() {
+        if (this.editor) {
+            this.editor.dispose();
+            this.editor = null;
+        }
+    }
 }

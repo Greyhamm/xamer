@@ -124,34 +124,43 @@ getSubmissions = asyncHandler(async (req, res) => {
   // @route   GET /api/submissions/:id
   // @access  Private
   getSubmission = asyncHandler(async (req, res) => {
-    const submission = await ExamSubmission.findById(req.params.id)
-      .populate('exam')
-      .populate('student', 'username email');
+    const { id } = req.params;
+    
+    console.log('Fetching submission:', id);
+    
+    if (!id) {
+        throw new ErrorResponse('Submission ID is required', 400);
+    }
+
+    const submission = await ExamSubmission.findById(id)
+        .populate({
+            path: 'exam',
+            populate: {
+                path: 'questions'
+            }
+        })
+        .populate('student', 'username email');
 
     if (!submission) {
-      throw new ErrorResponse('Submission not found', 404);
+        throw new ErrorResponse('Submission not found', 404);
     }
 
     // Verify user has access
-    if (
-      req.user.role === 'student' && 
-      submission.student._id.toString() !== req.user.userId
-    ) {
-      throw new ErrorResponse('Not authorized to view this submission', 403);
+    if (req.user.role === 'student' && 
+        submission.student._id.toString() !== req.user.userId) {
+        throw new ErrorResponse('Not authorized to view this submission', 403);
     }
 
-    if (
-      req.user.role === 'teacher' && 
-      submission.exam.creator.toString() !== req.user.userId
-    ) {
-      throw new ErrorResponse('Not authorized to view this submission', 403);
+    if (req.user.role === 'teacher' && 
+        submission.exam.creator.toString() !== req.user.userId) {
+        throw new ErrorResponse('Not authorized to view this submission', 403);
     }
 
     res.status(200).json({
-      success: true,
-      data: submission
+        success: true,
+        data: submission
     });
-  });
+});
 }
 
 module.exports = new SubmissionController();

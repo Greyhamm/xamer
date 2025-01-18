@@ -146,20 +146,23 @@ export default class SubmissionsList {
     `;
 
     // Add event listeners for grade/review buttons
-    table.addEventListener('click', (e) => {
-      const gradeButton = e.target.closest('.grade-btn');
-      if (gradeButton) {
-        const submissionId = gradeButton.dataset.submissionId;
-        console.log('Grade/Review submission:', submissionId);
-        
-        // Use AppState to navigate to grading view
-        AppState.navigateTo('gradingView', { 
-          submissionId,
-          examId: this.state.examId,
-          classId: this.state.classId
-        });
+  table.addEventListener('click', (e) => {
+    const gradeButton = e.target.closest('.grade-btn');
+    if (gradeButton) {
+      const submissionId = gradeButton.dataset.submissionId;
+      console.log('Grade/Review submission:', submissionId);
+      
+      if (!submissionId) {
+        console.error('No submission ID found');
+        return;
       }
-    });
+
+      // Pass the submissionId directly in the params object
+      AppState.navigateTo('gradingView', {
+        submissionId: submissionId
+      });
+    }
+  });
 
     this.container.appendChild(table);
 

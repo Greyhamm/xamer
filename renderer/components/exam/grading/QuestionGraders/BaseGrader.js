@@ -1,67 +1,78 @@
+// renderer/components/exam/grading/QuestionGraders/BaseGrader.js
 export default class BaseGrader {
-    constructor(options) {
+  constructor(options) {
       this.question = options.question;
       this.answer = options.answer;
       this.onGradeChange = options.onGradeChange;
       this.state = {
-        score: null,
-        feedback: ''
+          score: null,
+          feedback: ''
       };
-    }
-  
-    setState(newState) {
+  }
+
+  setState(newState) {
       this.state = { ...this.state, ...newState };
       if (this.onGradeChange) {
-        this.onGradeChange(this.state);
+          this.onGradeChange(this.state);
       }
-    }
-  
-    renderAnswerDisplay() {
-      return document.createElement('div');
-    }
-  
-    renderGradingControls() {
+  }
+
+  createGradingControls() {
       const container = document.createElement('div');
       container.className = 'grading-controls';
-  
+
       // Score input
-      const scoreGroup = document.createElement('div');
-      scoreGroup.className = 'form-group';
-      scoreGroup.innerHTML = `
-        <label>Score</label>
-        <input type="number" min="0" max="100" class="score-input" />
+      const scoreContainer = document.createElement('div');
+      scoreContainer.className = 'score-input-container';
+      scoreContainer.innerHTML = `
+          <label>Score (0-100):</label>
+          <input type="number" min="0" max="100" class="score-input" value="${this.state.score || ''}">
       `;
-  
-      const scoreInput = scoreGroup.querySelector('input');
-      scoreInput.value = this.state.score || '';
+
+      const scoreInput = scoreContainer.querySelector('input');
       scoreInput.addEventListener('input', (e) => {
-        this.setState({ score: parseInt(e.target.value, 10) || 0 });
+          this.setState({ score: parseInt(e.target.value) || 0 });
       });
-  
+
       // Feedback input
-      const feedbackGroup = document.createElement('div');
-      feedbackGroup.className = 'form-group';
-      feedbackGroup.innerHTML = `
-        <label>Feedback</label>
-        <textarea class="feedback-input" rows="3"></textarea>
+      const feedbackContainer = document.createElement('div');
+      feedbackContainer.className = 'feedback-input-container';
+      feedbackContainer.innerHTML = `
+          <label>Feedback:</label>
+          <textarea class="feedback-input" rows="3">${this.state.feedback || ''}</textarea>
       `;
-  
-      const feedbackInput = feedbackGroup.querySelector('textarea');
-      feedbackInput.value = this.state.feedback;
+
+      const feedbackInput = feedbackContainer.querySelector('textarea');
       feedbackInput.addEventListener('input', (e) => {
-        this.setState({ feedback: e.target.value });
+          this.setState({ feedback: e.target.value });
       });
-  
-      container.appendChild(scoreGroup);
-      container.appendChild(feedbackGroup);
+
+      container.appendChild(scoreContainer);
+      container.appendChild(feedbackContainer);
       return container;
-    }
-  
-    render() {
+  }
+
+  render() {
       const container = document.createElement('div');
       container.className = 'grader-container';
-      container.appendChild(this.renderAnswerDisplay());
-      container.appendChild(this.renderGradingControls());
+
+      // Question display
+      const questionDisplay = document.createElement('div');
+      questionDisplay.className = 'question-display';
+      questionDisplay.innerHTML = `<div class="question-prompt">${this.question.prompt}</div>`;
+      container.appendChild(questionDisplay);
+
+      // Answer display - to be implemented by specific graders
+      container.appendChild(this.renderAnswer());
+
+      // Grading controls
+      container.appendChild(this.createGradingControls());
+
       return container;
-    }
   }
+
+  renderAnswer() {
+      // To be implemented by specific graders
+      return document.createElement('div');
+  }
+}
