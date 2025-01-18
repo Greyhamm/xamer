@@ -1,7 +1,7 @@
 import MultipleChoiceRenderer from './QuestionTypes/MultipleChoiceRenderer.js';
 import WrittenRenderer from './QuestionTypes/WrittenRenderer.js';
 import CodingRenderer from './QuestionTypes/CodingRenderer.js';
-
+import AppState from '.././../../services/state/AppState.js';
 
 export default class ExamTaker {
   constructor() {
@@ -159,52 +159,68 @@ export default class ExamTaker {
 
   async submitExam() {
     try {
-      // Store the current answer before validation
-      if (this.currentRenderer?.getValue) {
-        const currentAnswer = this.currentRenderer.getValue();
-        if (currentAnswer && currentAnswer.questionId) {
-          this.state.answers.set(currentAnswer.questionId, {
-            questionId: currentAnswer.questionId,
-            answer: currentAnswer.answer || currentAnswer.selectedOption, // Handle multiple choice
-            timeSpent: Math.floor((Date.now() - this.state.timeStarted) / 1000)
-          });
+        // Store the current answer before validation
+        if (this.currentRenderer?.getValue) {
+            const currentAnswer = this.currentRenderer.getValue();
+            if (currentAnswer && currentAnswer.questionId) {
+                this.state.answers.set(currentAnswer.questionId, {
+                    questionId: currentAnswer.questionId,
+                    answer: currentAnswer.answer || currentAnswer.selectedOption,
+                    timeSpent: Math.floor((Date.now() - this.state.timeStarted) / 1000)
+                });
+            }
         }
-      }
 
-      if (!this.validateAnswers()) {
-        return;
-      }
+        if (!this.validateAnswers()) {
+            return;
+        }
 
-      this.setState({ loading: true, error: null });
+        // Show confirmation dialog
+        const confirmed = confirm(
+            "Are you sure you want to submit this exam?\n\n" +
+            "Please note that once submitted:" +
+            "\n- You cannot modify your answers" +
+            "\n- You cannot retake this exam" +
+            "\n\nClick OK to submit or Cancel to review your answers."
+        );
 
-      const formattedAnswers = Array.from(this.state.answers.values())
-        .filter(answer => answer && answer.questionId)
-        .map(answer => ({
-          questionId: answer.questionId,
-          answer: answer.answer,
-          timeSpent: answer.timeSpent || 0
-        }));
+        if (!confirmed) {
+            return;
+        }
 
-      console.log('Submitting exam data:', {
-        examId: this.state.exam._id,
-        answers: formattedAnswers
-      });
+        this.setState({ loading: true, error: null });
 
-      const response = await window.api.submitExam(this.state.exam._id, formattedAnswers);
+        const formattedAnswers = Array.from(this.state.answers.values())
+            .filter(answer => answer && answer.questionId)
+            .map(answer => ({
+                questionId: answer.questionId,
+                answer: answer.answer,
+                timeSpent: answer.timeSpent || 0
+            }));
 
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to submit exam');
-      }
+        console.log('Submitting exam data:', {
+            examId: this.state.exam._id,
+            answers: formattedAnswers
+        });
 
-      alert('Exam submitted successfully!');
-      window.location.hash = '#/dashboard';
-      
+        const response = await window.api.submitExam(this.state.exam._id, formattedAnswers);
+
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to submit exam');
+        }
+
+        // Show success message
+        alert('Exam submitted successfully!');
+
+        // Redirect to student dashboard
+        AppState.navigateTo('studentDashboard');
+        
     } catch (error) {
-      console.error('Submit exam error:', error);
-      this.setState({ 
-        error: error.message || 'Failed to submit exam. Please try again.', 
-        loading: false 
-      });
+        console.error('Submit exam error:', error);
+        this.setState({ 
+            error: error.message || 'Failed to submit exam. Please try again.', 
+            loading: false 
+        });
     }
   }
 
