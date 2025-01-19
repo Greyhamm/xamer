@@ -10,6 +10,7 @@ const codeExecutionRoutes = require('../backend/routes/codeExecution');
 const mediaRoutes = require('../backend/routes/media');
 const authRoutes = require('../backend/routes/auth');
 const submissionRoutes = require('../backend/routes/submission');
+const examLogRoutes = require('../backend/routes/examLog');
 const ipcAsyncHandler = require('../backend/utils/ipcAsyncHandler');
 const dotenv = require('dotenv');
 dotenv.config();
@@ -17,7 +18,7 @@ const classRoutes = require('../backend/routes/class');
 // Import controllers
 const { ExamController } = require('../backend/controllers/ExamController');
 const examController = new ExamController();
-
+const { execSync } = require('child_process');
 
 // Initialize Express App
 const expressApp = express();
@@ -50,6 +51,7 @@ expressApp.use('/api/submissions', submissionRoutes);
 expressApp.use('/api', submissionRoutes);
 // Serve static files from uploads directory
 expressApp.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+expressApp.use('/api/exam-logs', examLogRoutes);
 
 // Start Express Server
 const server = expressApp.listen(EXPRESS_PORT, () => {
@@ -198,6 +200,46 @@ ipcMain.handle('publish-exam', ipcAsyncHandler(async (event, data) => {
   }
 }));
 
+// Add this method to your main process
+function getRunningApplications() {
+  try {
+    let command;
+    switch (process.platform) {
+      case 'win32':
+        command = 'wmic process get description';
+        break;
+      case 'darwin':
+        command = 'ps -e -o comm=';
+        break;
+      case 'linux':
+        command = 'ps -e -o comm=';
+        break;
+      default:
+        throw new Error('Unsupported platform');
+    }
+
+    const output = execSync(command, { encoding: 'utf-8' });
+    const apps = output.split('\n')
+      .map(app => app.trim().toLowerCase())
+      .filter(app => app && app !== 'description'); // Remove empty and header lines
+
+    const blockedApps = ['chrome', 'firefox', 'safari', 'edge', 'opera', 'brave'];
+    return apps.filter(app => blockedApps.includes(app));
+  } catch (error) {
+    console.error('Error getting running applications:', error);
+    return [];
+  }
+}
+
+expressApp.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(err.statusCode || 500).json({
+    success: false,
+    error: err.message || 'Internal Server Error'
+  });
+});
+
+
 // Helper function to get user info
 async function getUserFromEvent(event) {
   // Get the stored user data from the sender
@@ -276,6 +318,11 @@ ipcMain.handle('submit-exam', ipcAsyncHandler(async (event, { examId, answers })
   });
 }));
 
+// In IPC setup
+ipcMain.handle('get-running-applications', () => {
+  return getRunningApplications();
+});
+
 // Handle grading submissions
 ipcMain.handle('grade-submission', ipcAsyncHandler(async (event, { submissionId, grades }) => {
   console.log('Grading submission:', submissionId);
@@ -287,6 +334,7 @@ ipcMain.handle('grade-submission', ipcAsyncHandler(async (event, { submissionId,
       role: event.sender.role
     }
   });
+  
 }));
 
 // Export the app for testing purposes

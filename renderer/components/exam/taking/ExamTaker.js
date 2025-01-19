@@ -2,9 +2,11 @@ import MultipleChoiceRenderer from './QuestionTypes/MultipleChoiceRenderer.js';
 import WrittenRenderer from './QuestionTypes/WrittenRenderer.js';
 import CodingRenderer from './QuestionTypes/CodingRenderer.js';
 import AppState from '.././../../services/state/AppState.js';
+import ExamMonitoringService from '../../../services/MonitoringService.js';
 
 export default class ExamTaker {
   constructor() {
+    this.ExamMonitoringService = null;
     this.state = {
       exam: null,
       currentQuestionIndex: 0,
@@ -26,12 +28,28 @@ export default class ExamTaker {
     try {
       this.setState({ loading: true, error: null });
       const examResponse = await window.api.getExamById(examId);
+      
       if (!examResponse.success) {
         throw new Error(examResponse.error || 'Failed to load exam');
       }
-      this.setState({ exam: examResponse.data, loading: false });
+  
+      // Initialize monitoring service
+      this.ExamMonitoringService = new ExamMonitoringService(examId);
+      await this.ExamMonitoringService.startSession();
+  
+      this.setState({ 
+        exam: examResponse.data, 
+        loading: false,
+        currentQuestionIndex: 0 
+      });
+  
       return true;
     } catch (error) {
+      // Ensure monitoring service is cleaned up in case of error
+      if (this.ExamMonitoringService) {
+        await this.ExamMonitoringService.endSession();
+      }
+  
       this.setState({ error: error.message, loading: false });
       return false;
     }
@@ -138,6 +156,10 @@ export default class ExamTaker {
         throw new Error(examResponse.error || 'Failed to load exam');
       }
 
+      // Initialize monitoring service
+      this.ExamMonitoringService = new ExamMonitoringService(examId);
+      await this.ExamMonitoringService.startSession();
+
       this.setState({ 
         exam: examResponse.data, 
         loading: false,
@@ -146,6 +168,11 @@ export default class ExamTaker {
 
       return true;
     } catch (error) {
+      // Ensure monitoring service is cleaned up in case of error
+      if (this.ExamMonitoringService) {
+        await this.ExamMonitoringService.endSession();
+      }
+
       this.setState({ error: error.message, loading: false });
       return false;
     }
@@ -212,15 +239,34 @@ export default class ExamTaker {
         // Show success message
         alert('Exam submitted successfully!');
 
-        // Redirect to student dashboard
-        AppState.navigateTo('studentDashboard');
-        
+              // End monitoring session before or after submission
+      if (this.ExamMonitoringService) {
+        await this.ExamMonitoringService.endSession();
+      }
+
+      // Your existing navigation or success handling
+      AppState.navigateTo('studentDashboard');
+      
     } catch (error) {
-        console.error('Submit exam error:', error);
-        this.setState({ 
-            error: error.message || 'Failed to submit exam. Please try again.', 
-            loading: false 
-        });
+      // Ensure monitoring service is ended even if submission fails
+      if (this.ExamMonitoringService) {
+        await this.ExamMonitoringService.endSession();
+      }
+
+      console.error('Submit exam error:', error);
+      this.setState({ 
+        error: error.message || 'Failed to submit exam. Please try again.', 
+        loading: false 
+      });
+    }
+  }
+
+  async handleUnexpectedExit() {
+    if (this.ExamMonitoringService) {
+      await this.ExamMonitoringService.logEvent('SYSTEM_VIOLATION', {
+        message: 'Unexpected exam interruption'
+      });
+      await this.ExamMonitoringService.endSession();
     }
   }
 
@@ -314,6 +360,21 @@ export default class ExamTaker {
     // Initial render of current question
     this.renderCurrentQuestion();
 
+    // Add event listeners for unexpected exits
+    window.addEventListener('beforeunload', async (e) => {
+      await this.handleUnexpectedExit();
+    });
+
     return this.container;
+  }
+
+  dispose() {
+    if (this.ExamMonitoringService) {
+      this.ExamMonitoringService.endSession();
+      this.ExamMonitoringService = null;
+    }
+  
+    // Remove any added event listeners
+    window.removeEventListener('beforeunload', this.handleUnexpectedExit);
   }
 }
