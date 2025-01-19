@@ -24,15 +24,11 @@ class UserState {
   }
 
   async initialize() {
-    if (AuthAPI.isAuthenticated()) {
-      try {
-        const profile = await AuthAPI.getProfile();
-        this.setUser(profile);
-      } catch (error) {
-        console.error('Failed to load user profile:', error);
-        AuthAPI.logout();
-      }
-    }
+    // Always clear user state
+    this.user = null;
+    localStorage.clear();
+    sessionStorage.clear();
+    return false;
   }
 
   setUser(user) {

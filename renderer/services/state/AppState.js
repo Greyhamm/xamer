@@ -1,5 +1,6 @@
 import UserState from './UserState.js';
 import ExamState from './ExamState.js';
+import AuthAPI from '../api/authApi.js'; // Add this import
 
 class AppState {
   constructor() {
@@ -35,8 +36,37 @@ class AppState {
   }
 
   async initialize() {
-    await this.userState.initialize();
-    this.navigateToDefaultView();
+    // Clear any existing state
+    this.currentView = null;
+    this.navigationHistory = [];
+    
+    try {
+      // Always navigate to auth page
+      this.navigateToAuth();
+      return;
+    } catch (error) {
+      console.error('Initialization error:', error);
+      this.navigateToAuth();
+    }
+  }
+
+  navigateToAuth() {
+    // Clear any stored state
+    localStorage.clear();
+    sessionStorage.clear();
+    this.userState.setUser(null);
+    this.navigateTo('auth', {}, { addToHistory: false });
+  }
+
+  async checkAuthentication() {
+    try {
+      // Attempt to validate stored credentials
+      const profile = await AuthAPI.getProfile();
+      return profile && profile.success;
+    } catch (error) {
+      console.error('Authentication check failed:', error);
+      return false;
+    }
   }
 
   navigateToDefaultView() {

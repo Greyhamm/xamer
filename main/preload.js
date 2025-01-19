@@ -2,25 +2,27 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 class PreloadBridge {
   constructor() {
-    this.userData = this.loadUserData();
+    this.userData = null;  // Initialize as null instead of loading from storage
   }
-
+  
   loadUserData() {
     try {
       const token = localStorage.getItem('token');
       const userId = localStorage.getItem('userId');
       const role = localStorage.getItem('role');
       
-      if (token && userId && role) {
-        const userData = { userId, role };
-        console.log('Loaded user data:', userData);
-        return userData;
-      }
+      // Always return null to force re-authentication
       return null;
     } catch (error) {
       console.error('Error loading user data:', error);
       return null;
     }
+  }
+  
+  clearUserData() {
+    localStorage.clear();
+    sessionStorage.clear();
+    this.userData = null;
   }
 
   saveUserData(responseData) {

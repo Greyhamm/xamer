@@ -117,14 +117,22 @@ app.on('before-quit', (event) => {
   setTimeout(() => {
     console.warn('Forcing app to quit.');
     process.exit(1);
-  }, 10000);
+  }, 5000);
 });
 
-// Adjust 'window-all-closed' Behavior
+
 app.on('window-all-closed', function () {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // Clear credentials when app is closed
+  const windows = BrowserWindow.getAllWindows();
+  windows.forEach(window => {
+    window.webContents.executeJavaScript(`
+      localStorage.clear();
+      sessionStorage.clear();
+    `);
+  });
+
+  // Quit the app on all platforms, not just non-macOS
+  app.quit();
 });
 
 // IPC Handlers
