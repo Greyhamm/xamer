@@ -1,10 +1,12 @@
 import MultipleChoiceRenderer from './QuestionTypes/MultipleChoiceRenderer.js';
 import WrittenRenderer from './QuestionTypes/WrittenRenderer.js';
 import CodingRenderer from './QuestionTypes/CodingRenderer.js';
-
+import AppState from '.././../../services/state/AppState.js';
+import ExamMonitoringService from '../../../services/MonitoringService.js';
 
 export default class ExamTaker {
   constructor() {
+    this.ExamMonitoringService = null;
     this.state = {
       exam: null,
       currentQuestionIndex: 0,
@@ -26,12 +28,28 @@ export default class ExamTaker {
     try {
       this.setState({ loading: true, error: null });
       const examResponse = await window.api.getExamById(examId);
+      
       if (!examResponse.success) {
         throw new Error(examResponse.error || 'Failed to load exam');
       }
-      this.setState({ exam: examResponse.data, loading: false });
+  
+      // Initialize monitoring service
+      this.ExamMonitoringService = new ExamMonitoringService(examId);
+      await this.ExamMonitoringService.startSession();
+  
+      this.setState({ 
+        exam: examResponse.data, 
+        loading: false,
+        currentQuestionIndex: 0 
+      });
+  
       return true;
     } catch (error) {
+      // Ensure monitoring service is cleaned up in case of error
+      if (this.ExamMonitoringService) {
+        await this.ExamMonitoringService.endSession();
+      }
+  
       this.setState({ error: error.message, loading: false });
       return false;
     }
@@ -138,6 +156,10 @@ export default class ExamTaker {
         throw new Error(examResponse.error || 'Failed to load exam');
       }
 
+      // Initialize monitoring service
+      this.ExamMonitoringService = new ExamMonitoringService(examId);
+      await this.ExamMonitoringService.startSession();
+
       this.setState({ 
         exam: examResponse.data, 
         loading: false,
@@ -146,6 +168,11 @@ export default class ExamTaker {
 
       return true;
     } catch (error) {
+      // Ensure monitoring service is cleaned up in case of error
+      if (this.ExamMonitoringService) {
+        await this.ExamMonitoringService.endSession();
+      }
+
       this.setState({ error: error.message, loading: false });
       return false;
     }
@@ -159,52 +186,87 @@ export default class ExamTaker {
 
   async submitExam() {
     try {
-      // Store the current answer before validation
-      if (this.currentRenderer?.getValue) {
-        const currentAnswer = this.currentRenderer.getValue();
-        if (currentAnswer && currentAnswer.questionId) {
-          this.state.answers.set(currentAnswer.questionId, {
-            questionId: currentAnswer.questionId,
-            answer: currentAnswer.answer || currentAnswer.selectedOption, // Handle multiple choice
-            timeSpent: Math.floor((Date.now() - this.state.timeStarted) / 1000)
-          });
+        // Store the current answer before validation
+        if (this.currentRenderer?.getValue) {
+            const currentAnswer = this.currentRenderer.getValue();
+            if (currentAnswer && currentAnswer.questionId) {
+                this.state.answers.set(currentAnswer.questionId, {
+                    questionId: currentAnswer.questionId,
+                    answer: currentAnswer.answer || currentAnswer.selectedOption,
+                    timeSpent: Math.floor((Date.now() - this.state.timeStarted) / 1000)
+                });
+            }
         }
+
+        if (!this.validateAnswers()) {
+            return;
+        }
+
+        // Show confirmation dialog
+        const confirmed = confirm(
+            "Are you sure you want to submit this exam?\n\n" +
+            "Please note that once submitted:" +
+            "\n- You cannot modify your answers" +
+            "\n- You cannot retake this exam" +
+            "\n\nClick OK to submit or Cancel to review your answers."
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        this.setState({ loading: true, error: null });
+
+        const formattedAnswers = Array.from(this.state.answers.values())
+            .filter(answer => answer && answer.questionId)
+            .map(answer => ({
+                questionId: answer.questionId,
+                answer: answer.answer,
+                timeSpent: answer.timeSpent || 0
+            }));
+
+        console.log('Submitting exam data:', {
+            examId: this.state.exam._id,
+            answers: formattedAnswers
+        });
+
+        const response = await window.api.submitExam(this.state.exam._id, formattedAnswers);
+
+        if (!response.success) {
+            throw new Error(response.error || 'Failed to submit exam');
+        }
+
+        // Show success message
+        alert('Exam submitted successfully!');
+
+              // End monitoring session before or after submission
+      if (this.ExamMonitoringService) {
+        await this.ExamMonitoringService.endSession();
       }
 
-      if (!this.validateAnswers()) {
-        return;
-      }
-
-      this.setState({ loading: true, error: null });
-
-      const formattedAnswers = Array.from(this.state.answers.values())
-        .filter(answer => answer && answer.questionId)
-        .map(answer => ({
-          questionId: answer.questionId,
-          answer: answer.answer,
-          timeSpent: answer.timeSpent || 0
-        }));
-
-      console.log('Submitting exam data:', {
-        examId: this.state.exam._id,
-        answers: formattedAnswers
-      });
-
-      const response = await window.api.submitExam(this.state.exam._id, formattedAnswers);
-
-      if (!response.success) {
-        throw new Error(response.error || 'Failed to submit exam');
-      }
-
-      alert('Exam submitted successfully!');
-      window.location.hash = '#/dashboard';
+      // Your existing navigation or success handling
+      AppState.navigateTo('studentDashboard');
       
     } catch (error) {
+      // Ensure monitoring service is ended even if submission fails
+      if (this.ExamMonitoringService) {
+        await this.ExamMonitoringService.endSession();
+      }
+
       console.error('Submit exam error:', error);
       this.setState({ 
         error: error.message || 'Failed to submit exam. Please try again.', 
         loading: false 
       });
+    }
+  }
+
+  async handleUnexpectedExit() {
+    if (this.ExamMonitoringService) {
+      await this.ExamMonitoringService.logEvent('SYSTEM_VIOLATION', {
+        message: 'Unexpected exam interruption'
+      });
+      await this.ExamMonitoringService.endSession();
     }
   }
 
@@ -298,6 +360,21 @@ export default class ExamTaker {
     // Initial render of current question
     this.renderCurrentQuestion();
 
+    // Add event listeners for unexpected exits
+    window.addEventListener('beforeunload', async (e) => {
+      await this.handleUnexpectedExit();
+    });
+
     return this.container;
+  }
+
+  dispose() {
+    if (this.ExamMonitoringService) {
+      this.ExamMonitoringService.endSession();
+      this.ExamMonitoringService = null;
+    }
+  
+    // Remove any added event listeners
+    window.removeEventListener('beforeunload', this.handleUnexpectedExit);
   }
 }

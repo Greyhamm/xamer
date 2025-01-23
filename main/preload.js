@@ -2,25 +2,27 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 class PreloadBridge {
   constructor() {
-    this.userData = this.loadUserData();
+    this.userData = null;  // Initialize as null instead of loading from storage
   }
-
+  
   loadUserData() {
     try {
       const token = localStorage.getItem('token');
       const userId = localStorage.getItem('userId');
       const role = localStorage.getItem('role');
       
-      if (token && userId && role) {
-        const userData = { userId, role };
-        console.log('Loaded user data:', userData);
-        return userData;
-      }
+      // Always return null to force re-authentication
       return null;
     } catch (error) {
       console.error('Error loading user data:', error);
       return null;
     }
+  }
+  
+  clearUserData() {
+    localStorage.clear();
+    sessionStorage.clear();
+    this.userData = null;
   }
 
   saveUserData(responseData) {
@@ -91,7 +93,7 @@ class PreloadBridge {
 
   async fetchApi({ endpoint, data = {}, method = 'POST', headers = {} } = {}) {
     const defaultHeaders = {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json', 
         ...this.getAuthHeader(),
         ...headers
     };
@@ -120,6 +122,50 @@ class PreloadBridge {
         throw new Error(error.message || 'API request failed');
     }
   }
+  async logExamEvent(options) {
+    try {
+      const response = await this.fetchApi({
+        endpoint: '/exam-logs', // Changed from '/exam-logs/log'
+        method: 'POST',
+        data: options,
+        headers: this.getAuthHeader()
+      });
+      return response;
+    } catch (error) {
+      console.error('Exam log error:', error);
+      throw error;
+    }
+  }
+  
+  async startExamSession(options) {
+    try {
+      const response = await this.fetchApi({
+        endpoint: '/exam-logs/start', // Updated endpoint
+        method: 'POST',
+        data: options,
+        headers: this.getAuthHeader()
+      });
+      return response;
+    } catch (error) {
+      console.error('Start exam session error:', error);
+      throw error;
+    }
+  }
+  
+  async endExamSession(options) {
+    try {
+      const response = await this.fetchApi({
+        endpoint: '/exam-logs/end',
+        method: 'POST',
+        data: options,
+        headers: this.getAuthHeader()
+      });
+      return response;
+    } catch (error) {
+      console.error('End exam session error:', error);
+      throw error;
+    }
+  }
 
   exposeApi() {
     contextBridge.exposeInMainWorld('api', {
@@ -132,7 +178,14 @@ class PreloadBridge {
       executeJavaScript: (data) => this.executeCode('javascript', data),
       executePython: (data) => this.executeCode('python', data),
       executeJava: (data) => this.executeCode('java', data),
+      startExamSession: (options) => this.startExamSession(options),
+      logExamEvent: (options) => this.logExamEvent(options),
+      endExamSession: (options) => this.endExamSession(options),
 
+      getUserId: () => {
+        return localStorage.getItem('userId');
+      },
+      
       // Class related endpoints
       createClass: (options) => this.fetchApi({
         endpoint: '/classes',
@@ -319,6 +372,20 @@ class PreloadBridge {
             ...this.getAuthHeader()
         }
     }),
+
+    getRunningApplications: () => {
+      try {
+        return execSync('tasklist').toString().split('\n')
+          .map(line => line.toLowerCase())
+          .filter(line => 
+            ['chrome', 'firefox', 'safari', 'edge', 'opera'].some(app => line.includes(app))
+          );
+      } catch (error) {
+        console.error('Error getting running applications:', error);
+        return [];
+      }
+    }
+
   });
 }
 

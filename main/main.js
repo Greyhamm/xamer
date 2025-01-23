@@ -10,6 +10,7 @@ const codeExecutionRoutes = require('../backend/routes/codeExecution');
 const mediaRoutes = require('../backend/routes/media');
 const authRoutes = require('../backend/routes/auth');
 const submissionRoutes = require('../backend/routes/submission');
+const examLogRoutes = require('../backend/routes/examLog');
 const ipcAsyncHandler = require('../backend/utils/ipcAsyncHandler');
 const dotenv = require('dotenv');
 dotenv.config();
@@ -17,7 +18,7 @@ const classRoutes = require('../backend/routes/class');
 // Import controllers
 const { ExamController } = require('../backend/controllers/ExamController');
 const examController = new ExamController();
-
+const { execSync } = require('child_process');
 
 // Initialize Express App
 const expressApp = express();
@@ -50,6 +51,7 @@ expressApp.use('/api/submissions', submissionRoutes);
 expressApp.use('/api', submissionRoutes);
 // Serve static files from uploads directory
 expressApp.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+expressApp.use('/api/exam-logs', examLogRoutes);
 
 // Start Express Server
 const server = expressApp.listen(EXPRESS_PORT, () => {
@@ -117,14 +119,22 @@ app.on('before-quit', (event) => {
   setTimeout(() => {
     console.warn('Forcing app to quit.');
     process.exit(1);
-  }, 10000);
+  }, 5000);
 });
 
-// Adjust 'window-all-closed' Behavior
+
 app.on('window-all-closed', function () {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // Clear credentials when app is closed
+  const windows = BrowserWindow.getAllWindows();
+  windows.forEach(window => {
+    window.webContents.executeJavaScript(`
+      localStorage.clear();
+      sessionStorage.clear();
+    `);
+  });
+
+  // Quit the app on all platforms, not just non-macOS
+  app.quit();
 });
 
 // IPC Handlers
@@ -189,6 +199,46 @@ ipcMain.handle('publish-exam', ipcAsyncHandler(async (event, data) => {
       throw error;
   }
 }));
+
+// Add this method to your main process
+function getRunningApplications() {
+  try {
+    let command;
+    switch (process.platform) {
+      case 'win32':
+        command = 'wmic process get description';
+        break;
+      case 'darwin':
+        command = 'ps -e -o comm=';
+        break;
+      case 'linux':
+        command = 'ps -e -o comm=';
+        break;
+      default:
+        throw new Error('Unsupported platform');
+    }
+
+    const output = execSync(command, { encoding: 'utf-8' });
+    const apps = output.split('\n')
+      .map(app => app.trim().toLowerCase())
+      .filter(app => app && app !== 'description'); // Remove empty and header lines
+
+    const blockedApps = ['chrome', 'firefox', 'safari', 'edge', 'opera', 'brave'];
+    return apps.filter(app => blockedApps.includes(app));
+  } catch (error) {
+    console.error('Error getting running applications:', error);
+    return [];
+  }
+}
+
+expressApp.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(err.statusCode || 500).json({
+    success: false,
+    error: err.message || 'Internal Server Error'
+  });
+});
+
 
 // Helper function to get user info
 async function getUserFromEvent(event) {
@@ -268,6 +318,11 @@ ipcMain.handle('submit-exam', ipcAsyncHandler(async (event, { examId, answers })
   });
 }));
 
+// In IPC setup
+ipcMain.handle('get-running-applications', () => {
+  return getRunningApplications();
+});
+
 // Handle grading submissions
 ipcMain.handle('grade-submission', ipcAsyncHandler(async (event, { submissionId, grades }) => {
   console.log('Grading submission:', submissionId);
@@ -279,6 +334,7 @@ ipcMain.handle('grade-submission', ipcAsyncHandler(async (event, { submissionId,
       role: event.sender.role
     }
   });
+  
 }));
 
 // Export the app for testing purposes
