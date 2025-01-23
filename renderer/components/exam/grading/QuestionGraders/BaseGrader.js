@@ -1,92 +1,177 @@
-// renderer/components/exam/grading/QuestionGraders/BaseGrader.js
+/**
+ * BaseGrader: An abstract base class for question grading components
+ * 
+ * This class provides a standardized interface and common functionality 
+ * for grading different types of questions. It serves as a template 
+ * for specific question type graders, establishing a consistent 
+ * approach to grading across various question formats.
+ * 
+ * Key Responsibilities:
+ * - Manage basic grading state
+ * - Provide a standard interface for grading components
+ * - Handle score and feedback tracking
+ * - Generate common grading UI elements
+ */
 export default class BaseGrader {
-  constructor(options) {
-      this.question = options.question;
-      this.answer = options.answer;
-      this.onGradeChange = options.onGradeChange;
-      this.state = {
-          score: this.answer.score || null,
-          feedback: this.answer.feedback || ''
-      };
-  }
+    /**
+     * Constructor for BaseGrader
+     * 
+     * Initializes the foundational state and tracking for question grading
+     * 
+     * @param {Object} options - Configuration options for the grader
+     * @param {Object} options.question - The question being graded
+     * @param {Object} options.answer - The student's submitted answer
+     * @param {Function} options.onGradeChange - Callback for grade updates
+     */
+    constructor(options) {
+        // Store the question and answer details
+        this.question = options.question;
+        this.answer = options.answer;
 
-  setState(newState) {
-      this.state = { ...this.state, ...newState };
-      if (this.onGradeChange) {
-          // Only send score and feedback to parent
-          const { score, feedback } = this.state;
-          this.onGradeChange({ score, feedback });
-      }
-      this.updateUI();
-  }
+        // Callback to notify parent component of grade changes
+        this.onGradeChange = options.onGradeChange;
 
-  updateUI() {
-      // To be implemented by specific graders
-  }
+        // Initialize grading state
+        this.state = {
+            // Track score for the question
+            score: this.answer.score || null,
+            
+            // Store feedback for the student's answer
+            feedback: this.answer.feedback || ''
+        };
+    }
 
-  createGradingControls() {
-      const container = document.createElement('div');
-      container.className = 'grading-controls';
+    /**
+     * Update the grading state and trigger change notification
+     * 
+     * @param {Object} newState - New state to merge with existing state
+     */
+    setState(newState) {
+        // Merge new state with existing state
+        this.state = { ...this.state, ...newState };
 
-      // Score input
-      const scoreContainer = document.createElement('div');
-      scoreContainer.className = 'score-input-container';
-      
-      const maxPoints = this.question.points;
-      scoreContainer.innerHTML = `
-        <label>Score (0-${maxPoints} points):</label>
-        <input type="number" min="0" max="${maxPoints}" class="score-input" value="${this.state.score || ''}">
-      `;
+        // Notify parent component of grade changes
+        if (this.onGradeChange) {
+            // Only send score and feedback to parent
+            const { score, feedback } = this.state;
+            this.onGradeChange({ score, feedback });
+        }
+
+        // Update UI to reflect state changes
+        this.updateUI();
+    }
+
+    /**
+     * Create standard grading controls for all question types
+     * 
+     * Generates a UI section with:
+     * - Score input
+     * - Feedback textarea
+     * 
+     * @returns {HTMLElement} Container with grading control elements
+     */
+    createGradingControls() {
+        const container = document.createElement('div');
+        container.className = 'grading-controls';
+
+        // Create score input section
+        const scoreContainer = document.createElement('div');
+        scoreContainer.className = 'score-input-container';
+        
+        // Determine maximum points for the question
+        const maxPoints = this.question.points;
+        
+        scoreContainer.innerHTML = `
+            <label>Score (0-${maxPoints} points):</label>
+            <input type="number" 
+                   min="0" 
+                   max="${maxPoints}" 
+                   class="score-input" 
+                   value="${this.state.score || ''}">
+        `;
     
-      const scoreInput = scoreContainer.querySelector('input');
-      scoreInput.addEventListener('input', (e) => {
-        const score = Math.min(parseInt(e.target.value) || 0, maxPoints);
-        this.setState({ score });
-      });
+        const scoreInput = scoreContainer.querySelector('input');
+        
+        // Add event listener to update score
+        scoreInput.addEventListener('input', (e) => {
+            // Ensure score is within valid range
+            const score = Math.min(parseInt(e.target.value) || 0, maxPoints);
+            this.setState({ score });
+        });
 
-      // Feedback input
-      const feedbackContainer = document.createElement('div');
-      feedbackContainer.className = 'feedback-input-container';
-      feedbackContainer.innerHTML = `
-          <label>Feedback:</label>
-          <textarea class="feedback-input" rows="3">${this.state.feedback || ''}</textarea>
-      `;
+        // Create feedback input section
+        const feedbackContainer = document.createElement('div');
+        feedbackContainer.className = 'feedback-input-container';
+        feedbackContainer.innerHTML = `
+            <label>Feedback:</label>
+            <textarea class="feedback-input" rows="3">${this.state.feedback || ''}</textarea>
+        `;
 
-      const feedbackInput = feedbackContainer.querySelector('textarea');
-      feedbackInput.addEventListener('input', (e) => {
-          this.setState({ feedback: e.target.value });
-      });
+        // Add event listener to update feedback
+        const feedbackInput = feedbackContainer.querySelector('textarea');
+        feedbackInput.addEventListener('input', (e) => {
+            this.setState({ feedback: e.target.value });
+        });
 
-      container.appendChild(scoreContainer);
-      container.appendChild(feedbackContainer);
-      return container;
-  }
+        // Compose final grading controls
+        container.appendChild(scoreContainer);
+        container.appendChild(feedbackContainer);
+        
+        return container;
+    }
 
-  render() {
-      const container = document.createElement('div');
-      container.className = 'grader-container';
+    /**
+     * Render the base grading interface
+     * 
+     * Provides a standard layout for grading components:
+     * - Question display
+     * - Answer display (to be implemented by child classes)
+     * - Grading controls
+     * 
+     * @returns {HTMLElement} Complete grading component container
+     */
+    render() {
+        const container = document.createElement('div');
+        container.className = 'grader-container';
 
-      // Question display
-      const questionDisplay = document.createElement('div');
-      questionDisplay.className = 'question-display';
-      container.appendChild(questionDisplay);
+        // Create question display area
+        const questionDisplay = document.createElement('div');
+        questionDisplay.className = 'question-display';
+        container.appendChild(questionDisplay);
 
-      // Answer display - to be implemented by specific graders
-      container.appendChild(this.renderAnswer());
+        // Render answer (to be implemented by specific graders)
+        container.appendChild(this.renderAnswer());
 
-      // Grading controls
-      container.appendChild(this.createGradingControls());
+        // Add standard grading controls
+        container.appendChild(this.createGradingControls());
 
-      return container;
-  }
+        return container;
+    }
 
-  renderAnswer() {
-      // To be implemented by specific graders
-      return document.createElement('div');
-  }
+    /**
+     * Placeholder method for rendering answer
+     * Must be overridden by specific grader implementations
+     * 
+     * @returns {HTMLElement} Default empty container
+     */
+    renderAnswer() {
+        return document.createElement('div');
+    }
 
-  dispose() {
-      // Clean up any resources
-      this.onGradeChange = null;
-  }
+    /**
+     * Placeholder method for updating UI
+     * Can be overridden by specific grader implementations
+     */
+    updateUI() {
+        // Default implementation does nothing
+    }
+
+    /**
+     * Clean up resources and remove event listeners
+     * Provides a standard disposal method for grading components
+     */
+    dispose() {
+        // Reset reference to change callback
+        this.onGradeChange = null;
+    }
 }

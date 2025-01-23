@@ -2,8 +2,17 @@ import Button from '../common/Button.js';
 import Input from '../common/Input.js';
 import UserState from '../../services/state/UserState.js';
 
+/**
+ * Manages the user registration form UI and signup process
+ * Handles form validation, user registration, and state management
+ */
 export default class SignupForm {
+  /**
+   * Initialize signup form state and configuration
+   * @param {Function} onSwitchToLogin - Callback to switch to login form
+   */
   constructor(onSwitchToLogin) {
+    // Initialize state for form inputs and validation
     this.state = {
       username: '',
       email: '',
@@ -16,23 +25,32 @@ export default class SignupForm {
     this.onSwitchToLogin = onSwitchToLogin;
   }
 
+  /**
+   * Validate signup form inputs
+   * Checks username, email, password, and password confirmation
+   * @returns {string[]} Array of validation error messages
+   */
   validateForm() {
     const errors = [];
 
+    // Username validation
     if (!this.state.username.trim()) {
       errors.push('Username is required');
     }
 
+    // Email validation
     if (!this.state.email.trim()) {
       errors.push('Email is required');
     } else if (!/\S+@\S+\.\S+/.test(this.state.email)) {
       errors.push('Email is invalid');
     }
 
+    // Password validation
     if (this.state.password.length < 6) {
       errors.push('Password must be at least 6 characters');
     }
 
+    // Password confirmation validation
     if (this.state.password !== this.state.confirmPassword) {
       errors.push('Passwords do not match');
     }
@@ -40,28 +58,33 @@ export default class SignupForm {
     return errors;
   }
 
+  /**
+   * Handle form submission and user registration
+   * Validates inputs, attempts registration, and manages loading/error states
+   * @param {Event} e - The form submission event
+   */
   async handleSubmit(e) {
     e.preventDefault();
     if (this.state.loading) return;
 
+    // Validate form inputs
     const errors = this.validateForm();
     if (errors.length > 0) {
       this.setState({ error: errors.join('\n') });
       return;
     }
 
-    // Add this line to log the current role
-    console.log('Submitting with role:', this.state.role);
-
+    // Set loading state and clear previous errors
     this.setState({ loading: true, error: null });
     this.submitButton.setLoading(true);
 
     try {
+      // Attempt user registration
       const result = await UserState.signup({
         username: this.state.username,
         email: this.state.email,
         password: this.state.password,
-        role: this.state.role // Ensure 'role' is included
+        role: this.state.role
       });
 
       if (!result) {
@@ -78,11 +101,19 @@ export default class SignupForm {
     }
   }
 
+  /**
+   * Update component state and trigger UI update
+   * @param {Object} newState - New state object to merge with existing state
+   */
   setState(newState) {
     this.state = { ...this.state, ...newState };
     this.updateUI();
   }
 
+  /**
+   * Update UI elements based on current state
+   * Manages error message display and visibility
+   */
   updateUI() {
     if (this.errorElement) {
       this.errorElement.style.display = this.state.error ? 'block' : 'none';
@@ -92,6 +123,10 @@ export default class SignupForm {
     }
   }
 
+  /**
+   * Render the signup form with inputs, buttons, and error handling
+   * @returns {HTMLElement} Complete signup form container
+   */
   render() {
     const container = document.createElement('div');
     container.className = 'auth-container';

@@ -1,17 +1,31 @@
+// renderer/components/class/ClassView.js
 import AppState from '../../services/state/AppState.js';
 import AddStudentsModal from './AddStudentsModal.js';
+
+/**
+ * Manages the detailed view of a specific class
+ * Displays class information, students, and exams
+ */
 export default class ClassView {
+    /**
+     * Initialize the class view with specific class details
+     * @param {string} classId - Unique identifier for the class
+     */
     constructor(classId) {
         this.state = {
             classId,
             classData: null,
             loading: true,
             error: null,
-            removeInProgress: new Set() // Initialize the Set properly
+            removeInProgress: new Set() // Track students being removed
         };
         this.loadClassData();
     }
 
+    /**
+     * Fetch detailed class data from the API
+     * Populates class information, students, and exams
+     */
     async loadClassData() {
         try {
             this.setState({ loading: true, error: null });
@@ -44,15 +58,23 @@ export default class ClassView {
         }
     }
 
+    /**
+     * Update component state and trigger UI refresh
+     * @param {Object} newState - New state to merge with existing state
+     */
     setState(newState) {
         this.state = { 
             ...this.state, 
             ...newState,
-            removeInProgress: this.state.removeInProgress || new Set() // Preserve the Set during state updates
+            removeInProgress: this.state.removeInProgress || new Set()
         };
         this.updateUI();
     }
 
+    /**
+     * Remove a student from the class
+     * @param {string} studentId - Unique identifier of the student to remove
+     */
     async removeStudent(studentId) {
         try {
             // Set removal in progress
@@ -91,14 +113,17 @@ export default class ClassView {
         }
     }
 
-
+    /**
+     * Format a date string into a more readable format
+     * @param {string} dateString - Date to be formatted
+     * @returns {string} Formatted date string
+     */
     formatDate(dateString) {
         if (!dateString) return 'N/A';
         try {
             const date = new Date(dateString);
             if (isNaN(date.getTime())) return 'N/A';
             
-            // Format date with more details
             return new Intl.DateTimeFormat('en-US', {
                 year: 'numeric',
                 month: 'short',
@@ -112,13 +137,20 @@ export default class ClassView {
         }
     }
 
-
+    /**
+     * Update the user interface when state changes
+     */
     updateUI() {
         if (!this.container) return;
         this.container.innerHTML = '';
         this.container.appendChild(this.render());
     }
 
+    /**
+     * Render the overview section of the class
+     * Displays class name, description, and key statistics
+     * @returns {HTMLElement} Overview section element
+     */
     renderOverviewSection() {
         const { name, description, students = [], exams = [] } = this.state.classData;
         
@@ -153,6 +185,11 @@ export default class ClassView {
         return section;
     }
 
+    /**
+     * Render the exams section for the class
+     * Displays list of exams with options to create, view, and publish
+     * @returns {HTMLElement} Exams section element
+     */
     renderExamsSection() {
         const section = document.createElement('div');
         section.className = 'dashboard-section exams-section';
@@ -213,7 +250,7 @@ export default class ClassView {
                     </div>
                 `;
     
-                // Add event listeners
+                // Add event listeners for view, publish, and submissions buttons
                 const publishBtn = examCard.querySelector('.publish-btn');
                 if (publishBtn) {
                     publishBtn.addEventListener('click', async (e) => {
@@ -227,7 +264,6 @@ export default class ClassView {
                     });
                 }
     
-                // Add event listener for submissions
                 const submissionsBtn = examCard.querySelector('.submissions-btn');
                 if (submissionsBtn) {
                     submissionsBtn.addEventListener('click', (e) => {
@@ -235,7 +271,6 @@ export default class ClassView {
                         const examId = e.target.dataset.examId;
                         console.log('View submissions for exam:', examId);
                         
-                        // Navigate to submissions view with exam ID
                         AppState.navigateTo('submissionsList', { 
                             examId: examId, 
                             classId: this.state.classId 
@@ -252,7 +287,11 @@ export default class ClassView {
         return section;
     }
 
-
+    /**
+     * Render the students section for the class
+     * Displays list of students with options to add and remove
+     * @returns {HTMLElement} Students section element
+     */
     renderStudentsSection() {
         const section = document.createElement('div');
         section.className = 'dashboard-section students-section';
@@ -311,7 +350,6 @@ export default class ClassView {
                 </table>
             `;
 
-            // Add event listeners for buttons
             const tbody = studentsList.querySelector('tbody');
             if (tbody) {
                 tbody.addEventListener('click', async (e) => {
@@ -348,6 +386,10 @@ export default class ClassView {
         return section;
     }
 
+    /**
+     * Render the complete class view
+     * @returns {HTMLElement} Complete class view container
+     */
     render() {
         this.container = document.createElement('div');
         this.container.className = 'class-view-container';

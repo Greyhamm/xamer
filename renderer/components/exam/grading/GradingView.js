@@ -1,10 +1,27 @@
-// renderer/components/exam/grading/GradingView.js
 import { MultipleChoiceGrader, WrittenGrader, CodingGrader } from './QuestionGraders/index.js';
 import AppState from '../../../services/state/AppState.js';
+
+/**
+ * GradingView: A comprehensive interface for grading exam submissions
+ * 
+ * This class provides a detailed, interactive view for teachers to:
+ * - Review student submission details
+ * - Grade individual questions
+ * - Provide feedback
+ * - Submit final grades
+ */
 export default class GradingView {
+    /**
+     * Initialize the grading view with submission context
+     * 
+     * @param {Object} options - Configuration options for grading view
+     * @param {string} options.submissionId - Unique identifier for the submission
+     */
     constructor(options) {
         this.submissionId = options?.submissionId;
-        this.examId = null; // Add this to store exam ID
+        this.examId = null; 
+        
+        // Comprehensive state management
         this.state = {
             submission: null,
             grades: new Map(),
@@ -12,26 +29,38 @@ export default class GradingView {
             error: null
         };
     
+        // Map question types to their specific grading components
         this.graders = {
             MultipleChoice: MultipleChoiceGrader,
             Written: WrittenGrader,
             Coding: CodingGrader
         };
     
+        // Cache grader instances for resource management
         this.graderInstances = new Map();
         this.container = null;
     }
 
+    /**
+     * Update component state with intelligent change detection
+     * 
+     * @param {Object} newState - Partial state object to merge
+     */
     setState(newState) {
         const prevState = this.state;
         this.state = { ...this.state, ...newState };
         
-        // Only update UI if needed
+        // Only update UI if state has meaningfully changed
         if (JSON.stringify(prevState) !== JSON.stringify(this.state)) {
             requestAnimationFrame(() => this.updateUI());
         }
     }
 
+    /**
+     * Retrieve detailed submission data from the API
+     * 
+     * Handles complex data loading with robust error management
+     */
     async loadSubmission() {
         try {
             const response = await window.api.getSubmissionById(this.submissionId);
@@ -41,7 +70,7 @@ export default class GradingView {
             }
     
             const submission = response.data;
-            this.examId = submission.exam._id; // Store the exam ID
+            this.examId = submission.exam._id; 
             
             // Match answers with questions
             submission.answers = submission.answers.map(answer => {
@@ -68,12 +97,25 @@ export default class GradingView {
         }
     }
 
+    /**
+     * Handle grade changes for individual questions
+     * 
+     * @param {string} questionId - Unique identifier for the question
+     * @param {Object} gradeData - Grade and feedback information
+     */
     handleGradeChange(questionId, gradeData) {
         const newGrades = new Map(this.state.grades);
         newGrades.set(questionId, gradeData);
         this.setState({ grades: newGrades });
     }
 
+    /**
+     * Create a specialized grader for each question type
+     * 
+     * @param {Object} answer - The student's answer for a specific question
+     * @param {number} index - Index of the question in the submission
+     * @returns {Object|null} Appropriate grader instance for the question type
+     */
     createGrader(answer, index) {
         const question = answer.questionData;
         if (!question) return null;
@@ -90,7 +132,7 @@ export default class GradingView {
             question,
             answer: {
                 ...answer,
-                question: question // Ensure question data is available
+                question: question
             },
             onGradeChange: (gradeData) => {
                 this.handleGradeChange(question._id, gradeData);
@@ -101,6 +143,11 @@ export default class GradingView {
         return grader;
     }
 
+    /**
+     * Render individual question grading sections
+     * 
+     * @returns {HTMLElement|null} Container with question grading sections
+     */
     renderQuestions() {
         if (!this.state.submission?.answers) return null;
 
@@ -141,11 +188,14 @@ export default class GradingView {
         return container;
     }
 
+    /**
+     * Submit final grades for the entire submission
+     */
     async submitGrades() {
         try {
             this.setState({ loading: true, error: null });
     
-            // Validate all questions have grades
+            // Validate all questions have been graded
             for (const answer of this.state.submission.answers) {
                 if (!this.state.grades.has(answer.question)) {
                     throw new Error('Please grade all questions before submitting');
@@ -165,7 +215,7 @@ export default class GradingView {
     
             alert('Grades submitted successfully!');
             
-            // Navigate back to submissions list with exam ID
+            // Navigate back to submissions list
             AppState.navigateTo('submissionsList', { 
                 examId: this.examId,
                 classId: this.state.submission.exam.class 
@@ -180,6 +230,9 @@ export default class GradingView {
         }
     }
     
+    /**
+     * Update the user interface based on current state
+     */
     updateUI() {
         if (!this.container) return;
         
@@ -235,6 +288,11 @@ export default class GradingView {
         this.container.appendChild(submitButton);
     }
 
+    /**
+     * Initial rendering method for the grading view
+     * 
+     * @returns {HTMLElement} Complete grading view container
+     */
     render() {
         this.container = document.createElement('div');
         this.container.className = 'grading-view';
@@ -248,6 +306,9 @@ export default class GradingView {
         return this.container;
     }
 
+    /**
+     * Clean up resources when component is no longer needed
+     */
     dispose() {
         this.graderInstances.forEach(grader => {
             if (grader.dispose) {

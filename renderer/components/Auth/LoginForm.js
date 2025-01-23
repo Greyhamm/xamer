@@ -3,8 +3,17 @@ import Input from '../common/Input.js';
 import UserState from '../../services/state/UserState.js';
 import AppState from '../../services/state/AppState.js';
 
+/**
+ * Manages the login form UI and authentication process
+ * Handles user login, state management, and navigation
+ */
 export default class LoginForm {
+  /**
+   * Initialize login form state and configuration
+   * @param {Function} onSwitchToSignup - Callback to switch to signup form
+   */
   constructor(onSwitchToSignup) {
+    // Initialize state for form inputs and handling
     this.state = {
       email: '',
       password: '',
@@ -13,19 +22,25 @@ export default class LoginForm {
     };
     this.onSwitchToSignup = onSwitchToSignup;
     
-    // Bind methods
+    // Bind methods to preserve context
     this.handleSubmit = this.handleSubmit.bind(this);
   }
 
+  /**
+   * Handle form submission and user authentication
+   * Validates input, attempts login, and navigates based on user role
+   * @param {Event} e - The form submission event
+   */
   async handleSubmit(e) {
     e.preventDefault();
     if (this.state.loading) return;
 
+    // Set loading state and clear previous errors
     this.setState({ loading: true, error: null });
     this.submitButton.setLoading(true);
 
     try {
-      // Attempt login
+      // Attempt login using UserState
       const response = await UserState.login({
         email: this.state.email,
         password: this.state.password
@@ -37,14 +52,14 @@ export default class LoginForm {
         throw new Error(response.message || 'Login failed');
       }
 
-      // Set user data
+      // Set user data in UserState
       UserState.setUser({
         userId: response.userId,
         role: response.role,
         username: response.username
       });
 
-      // Navigate based on role
+      // Navigate based on user role
       console.log('Navigating user with role:', response.role);
       if (response.role === 'teacher') {
         AppState.navigateTo('teacherDashboard');
@@ -65,11 +80,19 @@ export default class LoginForm {
     }
   }
 
+  /**
+   * Update component state and trigger UI update
+   * @param {Object} newState - New state object to merge with existing state
+   */
   setState(newState) {
     this.state = { ...this.state, ...newState };
     this.updateUI();
   }
 
+  /**
+   * Update UI elements based on current state
+   * Manages error message display and visibility
+   */
   updateUI() {
     if (this.errorElement) {
       this.errorElement.style.display = this.state.error ? 'block' : 'none';
@@ -79,6 +102,10 @@ export default class LoginForm {
     }
   }
 
+  /**
+   * Render the login form with inputs, buttons, and error handling
+   * @returns {HTMLElement} Complete login form container
+   */
   render() {
     const container = document.createElement('div');
     container.className = 'auth-container';

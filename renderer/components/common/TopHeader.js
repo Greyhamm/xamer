@@ -1,12 +1,24 @@
-// renderer/components/common/TopHeader.js
 import AppState from '../../services/state/AppState.js';
 import UserState from '../../services/state/UserState.js';
 
+/**
+ * Represents the top navigation header for the application
+ * Provides navigation and user context-specific actions
+ */
 export default class TopHeader {
+  /**
+   * Initialize the top header
+   * Prepares the header element for rendering
+   */
   constructor() {
+    // Store reference to the header element
     this.element = null;
   }
 
+  /**
+   * Handle user logout process
+   * Clears local storage and reloads the page
+   */
   handleLogout() {
     localStorage.removeItem('token');
     localStorage.removeItem('userId');
@@ -14,12 +26,23 @@ export default class TopHeader {
     window.location.reload();
   }
 
+  /**
+   * Handle navigation back to previous view
+   * Uses AppState to manage navigation history
+   */
   handleBack() {
     if (AppState.canNavigateBack()) {
       AppState.navigateBack();
     }
   }
 
+  /**
+   * Create a navigation button with custom styling and behavior
+   * @param {string} text - Button display text
+   * @param {Function} onClick - Click event handler
+   * @param {string} [variant='default'] - Button style variant
+   * @returns {HTMLButtonElement} Styled navigation button
+   */
   createNavButton(text, onClick, variant = 'default') {
     const button = document.createElement('button');
     button.className = `nav-button nav-button-${variant}`;
@@ -37,6 +60,7 @@ export default class TopHeader {
       margin-right: 1rem;
     `;
 
+    // Add hover effects
     button.addEventListener('mouseover', () => {
       button.style.backgroundColor = variant === 'default' ? '#e5e7eb' : '#4338ca';
     });
@@ -49,6 +73,10 @@ export default class TopHeader {
     return button;
   }
 
+  /**
+   * Render the top header with navigation and user actions
+   * @returns {HTMLElement} Complete header element
+   */
   render() {
     const header = document.createElement('header');
     header.className = 'top-header';
@@ -83,7 +111,7 @@ export default class TopHeader {
       gap: 1rem;
     `;
     
-    // Add back button if we can navigate back
+    // Add back button if navigation is possible
     if (AppState.shouldShowBackButton()) {
       const backButton = this.createNavButton('← Back', () => this.handleBack());
       leftSection.appendChild(backButton);
@@ -160,6 +188,9 @@ export default class TopHeader {
     return header;
   }
 
+  /**
+   * Remove the header element from the DOM
+   */
   dispose() {
     if (this.element) {
       this.element.remove();
