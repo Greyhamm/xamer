@@ -1,10 +1,19 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+/**
+ * PreloadBridge class to handle communication between the renderer process and the main process.
+ * It manages user data, API requests, and exposes methods to the renderer process.
+ */
 class PreloadBridge {
   constructor() {
-    this.userData = null;  // Initialize as null instead of loading from storage
+    this.userData = null;  // Initialize user data as null instead of loading from storage
   }
   
+  /**
+   * Load user data from local storage.
+   * Currently, it always returns null to force re-authentication.
+   * @returns {null} Always returns null.
+   */
   loadUserData() {
     try {
       const token = localStorage.getItem('token');
@@ -19,12 +28,19 @@ class PreloadBridge {
     }
   }
   
+  /**
+   * Clear user data from local and session storage.
+   */
   clearUserData() {
     localStorage.clear();
     sessionStorage.clear();
     this.userData = null;
   }
 
+  /**
+   * Save user data to local storage.
+   * @param {Object} responseData - The user data to save.
+   */
   saveUserData(responseData) {
     try {
       if (responseData.token) {
@@ -42,12 +58,22 @@ class PreloadBridge {
     }
   }
 
+  /**
+   * Get the authorization header with the token.
+   * @returns {Object} The authorization header.
+   */
   getAuthHeader() {
     const token = localStorage.getItem('token');
     console.log('Getting auth header, token exists:', !!token);
     return token ? { 'Authorization': `Bearer ${token}` } : {};
   }
 
+  /**
+   * Execute code by making an API request to the server.
+   * @param {string} endpoint - The API endpoint to execute the code.
+   * @param {Object} data - The code and input data.
+   * @returns {Object} The response from the server.
+   */
   async executeCode(endpoint, data) {
     try {
       const response = await this.fetchApi({
@@ -66,6 +92,11 @@ class PreloadBridge {
     }
   }
 
+  /**
+   * Login the user by making an API request to the server.
+   * @param {Object} options - The login options.
+   * @returns {Object} The response from the server.
+   */
   async login(options) {
     try {
       const response = await this.fetchApi({
@@ -91,6 +122,11 @@ class PreloadBridge {
     }
   }
 
+  /**
+   * Make an API request to the server.
+   * @param {Object} options - The API request options.
+   * @returns {Object} The response from the server.
+   */
   async fetchApi({ endpoint, data = {}, method = 'POST', headers = {} } = {}) {
     const defaultHeaders = {
         'Content-Type': 'application/json', 
@@ -122,6 +158,12 @@ class PreloadBridge {
         throw new Error(error.message || 'API request failed');
     }
   }
+
+  /**
+   * Log an exam event by making an API request to the server.
+   * @param {Object} options - The exam event options.
+   * @returns {Object} The response from the server.
+   */
   async logExamEvent(options) {
     try {
       const response = await this.fetchApi({
@@ -137,6 +179,11 @@ class PreloadBridge {
     }
   }
   
+  /**
+   * Start an exam session by making an API request to the server.
+   * @param {Object} options - The exam session options.
+   * @returns {Object} The response from the server.
+   */
   async startExamSession(options) {
     try {
       const response = await this.fetchApi({
@@ -152,6 +199,11 @@ class PreloadBridge {
     }
   }
   
+  /**
+   * End an exam session by making an API request to the server.
+   * @param {Object} options - The exam session options.
+   * @returns {Object} The response from the server.
+   */
   async endExamSession(options) {
     try {
       const response = await this.fetchApi({
@@ -167,6 +219,9 @@ class PreloadBridge {
     }
   }
 
+  /**
+   * Expose the API methods to the renderer process.
+   */
   exposeApi() {
     contextBridge.exposeInMainWorld('api', {
       // Existing methods...
@@ -389,6 +444,11 @@ class PreloadBridge {
   });
 }
 
+  /**
+   * Upload media files to the server.
+   * @param {File} file - The file to upload.
+   * @returns {Object} The response from the server.
+   */
   async uploadMedia(file) {
     try {
       const formData = new FormData();

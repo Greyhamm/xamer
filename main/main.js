@@ -1,20 +1,25 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
-const path = require('path');
-const express = require('express');
-const fs = require('fs');
-const bodyParser = require('body-parser');
-const cors = require('cors');
 const mongoose = require('mongoose');
+const fs = require('fs');
+const express = require('express');
+const cors = require('cors');
+const bodyParser = require('body-parser');
+const path = require('path');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const ipcAsyncHandler = require('../backend/utils/ipcAsyncHandler');
+
 const examRoutes = require('../backend/routes/exam');
 const codeExecutionRoutes = require('../backend/routes/codeExecution');
 const mediaRoutes = require('../backend/routes/media');
 const authRoutes = require('../backend/routes/auth');
 const submissionRoutes = require('../backend/routes/submission');
 const examLogRoutes = require('../backend/routes/examLog');
-const ipcAsyncHandler = require('../backend/utils/ipcAsyncHandler');
-const dotenv = require('dotenv');
-dotenv.config();
 const classRoutes = require('../backend/routes/class');
+
+
+
 // Import controllers
 const { ExamController } = require('../backend/controllers/ExamController');
 const examController = new ExamController();
@@ -34,7 +39,6 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-
 // Connect to MongoDB
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/electron_exam_app';
 mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -49,6 +53,7 @@ expressApp.use('/api/media', mediaRoutes);
 expressApp.use('/api', classRoutes);
 expressApp.use('/api/submissions', submissionRoutes);
 expressApp.use('/api', submissionRoutes);
+
 // Serve static files from uploads directory
 expressApp.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 expressApp.use('/api/exam-logs', examLogRoutes);
@@ -72,7 +77,7 @@ function createWindow() {
     }
   });
 
-  // Set CSP headers
+  // Set CSP headers for security
   win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -91,6 +96,7 @@ function createWindow() {
     });
   });
 
+  // Load the main HTML file
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
 
   // Uncomment to open DevTools by default
@@ -122,9 +128,8 @@ app.on('before-quit', (event) => {
   }, 5000);
 });
 
-
+// Clear credentials when app is closed
 app.on('window-all-closed', function () {
-  // Clear credentials when app is closed
   const windows = BrowserWindow.getAllWindows();
   windows.forEach(window => {
     window.webContents.executeJavaScript(`
@@ -137,7 +142,6 @@ app.on('window-all-closed', function () {
   app.quit();
 });
 
-// IPC Handlers
 // IPC Handlers
 ipcMain.handle('create-exam', ipcAsyncHandler(async (event, data) => {
   console.log('Create exam data received in IPC handler:', data);
@@ -176,8 +180,6 @@ ipcMain.handle('create-exam', ipcAsyncHandler(async (event, data) => {
   }
 }));
 
-
-
 ipcMain.handle('publish-exam', ipcAsyncHandler(async (event, data) => {
   console.log('Publishing exam:', data);
   
@@ -200,46 +202,6 @@ ipcMain.handle('publish-exam', ipcAsyncHandler(async (event, data) => {
   }
 }));
 
-// Add this method to your main process
-function getRunningApplications() {
-  try {
-    let command;
-    switch (process.platform) {
-      case 'win32':
-        command = 'wmic process get description';
-        break;
-      case 'darwin':
-        command = 'ps -e -o comm=';
-        break;
-      case 'linux':
-        command = 'ps -e -o comm=';
-        break;
-      default:
-        throw new Error('Unsupported platform');
-    }
-
-    const output = execSync(command, { encoding: 'utf-8' });
-    const apps = output.split('\n')
-      .map(app => app.trim().toLowerCase())
-      .filter(app => app && app !== 'description'); // Remove empty and header lines
-
-    const blockedApps = ['chrome', 'firefox', 'safari', 'edge', 'opera', 'brave'];
-    return apps.filter(app => blockedApps.includes(app));
-  } catch (error) {
-    console.error('Error getting running applications:', error);
-    return [];
-  }
-}
-
-expressApp.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(err.statusCode || 500).json({
-    success: false,
-    error: err.message || 'Internal Server Error'
-  });
-});
-
-
 // Helper function to get user info
 async function getUserFromEvent(event) {
   // Get the stored user data from the sender
@@ -254,6 +216,7 @@ async function getUserFromEvent(event) {
   return { userId, role };
 }
 
+// IPC handler to get exams
 ipcMain.handle('get-exams', ipcAsyncHandler(async (event) => {
   console.log('Fetching exams for user:', event.sender.userId);
   return await examController.getExams({
@@ -264,6 +227,7 @@ ipcMain.handle('get-exams', ipcAsyncHandler(async (event) => {
   });
 }));
 
+// IPC handler to get exam by ID
 ipcMain.handle('get-exam-by-id', ipcAsyncHandler(async (event, examId) => {
   console.log('Fetching exam:', examId);
   return await examController.getExam({
@@ -275,8 +239,7 @@ ipcMain.handle('get-exam-by-id', ipcAsyncHandler(async (event, examId) => {
   });
 }));
 
-
-
+// IPC handler to get exam stats
 ipcMain.handle('get-exam-stats', ipcAsyncHandler(async (event, data) => {
   // Ensure we have userData
   if (!data?.userData) {
@@ -291,6 +254,7 @@ ipcMain.handle('get-exam-stats', ipcAsyncHandler(async (event, data) => {
   });
 }));
 
+// IPC handler to get recent exams
 ipcMain.handle('get-recent-exams', ipcAsyncHandler(async (event, data) => {
   // Ensure we have userData
   if (!data?.userData) {
@@ -305,7 +269,6 @@ ipcMain.handle('get-recent-exams', ipcAsyncHandler(async (event, data) => {
   });
 }));
 
-
 // Handle exam submissions
 ipcMain.handle('submit-exam', ipcAsyncHandler(async (event, { examId, answers }) => {
   console.log('Submitting exam:', examId);
@@ -318,7 +281,7 @@ ipcMain.handle('submit-exam', ipcAsyncHandler(async (event, { examId, answers })
   });
 }));
 
-// In IPC setup
+// IPC handler to get running applications
 ipcMain.handle('get-running-applications', () => {
   return getRunningApplications();
 });
@@ -334,7 +297,6 @@ ipcMain.handle('grade-submission', ipcAsyncHandler(async (event, { submissionId,
       role: event.sender.role
     }
   });
-  
 }));
 
 // Export the app for testing purposes
